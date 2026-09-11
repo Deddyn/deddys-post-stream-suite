@@ -4,7 +4,7 @@ import socket
 from datetime import datetime
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode, quote
+from urllib.parse import urlencode, quote, urlparse
 from .core import video_id, match_row
 
 class ApiError(Exception):
@@ -15,6 +15,8 @@ class Http:
         self.opener, self.sleep = opener, sleep
 
     def get(self, url, headers=None):
+        host = urlparse(url).hostname or ''
+        provider = 'Riot' if host.endswith('.api.riotgames.com') else ('YouTube' if host == 'www.googleapis.com' else 'API')
         for attempt in range(4):
             try:
                 with self.opener(Request(url, headers=headers or {}), timeout=25) as response:
@@ -26,10 +28,33 @@ class Http:
                     except (ValueError, TypeError):
                         delay = 5
                     if delay <= 120:
+                        error.close()
                         self.sleep(delay)
                         continue
                 messages = {401: 'Credenziali non valide.', 403: 'Accesso negato: verifica key, scadenza, API abilitata e quota.', 404: 'Account o risorsa non trovata.', 429: 'Limite API raggiunto. Riprova più tardi.'}
-                raise ApiError(messages.get(error.code, f'Servizio non disponibile (HTTP {error.code}).')) from None
+                message = messages.get(error.code, 'Servizio non disponibile.')
+                if provider == 'Riot' and error.code in (401, 403):
+                    message = 'Chiave rifiutata o accesso non autorizzato. Apri Riot Developer Portal, copia la Personal API Key del progetto approvato e reinseriscila. Se usi una Development Key, verifica la scadenza e rigenerala se necessario.'
+                if provider == 'YouTube':
+                    # Interpret only known codes; never display response text or URLs containing keys.
+                    try:
+                        payload = json.loads(error.read(65536))['error']
+                        reasons = [e.get('reason') for e in payload.get('errors', []) + payload.get('details', []) if isinstance(e, dict)]
+                    except (ValueError, KeyError, TypeError, AttributeError, OSError):
+                        reasons = []
+                    hints = {
+                        'accessNotConfigured': 'Abilita YouTube Data API v3 nel progetto Google Cloud della chiave e riprova dopo qualche minuto.',
+                        'SERVICE_DISABLED': 'Abilita YouTube Data API v3 nel progetto Google Cloud della chiave e riprova dopo qualche minuto.',
+                        'quotaExceeded': 'Quota YouTube esaurita. Attendi il ripristino oppure usa Manuale.',
+                        'dailyLimitExceeded': 'Quota YouTube esaurita. Attendi il ripristino oppure usa Manuale.',
+                        'keyInvalid': 'YouTube API key non valida. Ricopiala dalle credenziali Google Cloud.',
+                        'API_KEY_INVALID': 'YouTube API key non valida. Ricopiala dalle credenziali Google Cloud.',
+                        'API_KEY_SERVICE_BLOCKED': 'Le restrizioni della chiave devono consentire YouTube Data API v3.',
+                        'API_KEY_HTTP_REFERRER_BLOCKED': 'La chiave è limitata a siti web. Per questa app desktop modifica le restrizioni applicazione della chiave.',
+                        'ipRefererBlocked': 'Le restrizioni applicazione della chiave bloccano questo computer. Controllale in Google Cloud.'}
+                    message = next((hints[r] for r in reasons if r in hints), message)
+                error.close()
+                raise ApiError(f'{provider} (HTTP {error.code}): {message}') from None
             except (URLError, socket.timeout, TimeoutError, OSError):
                 raise ApiError('Connessione fallita. Verifica rete e riprova.') from None
             except (ValueError, UnicodeError):

@@ -59,6 +59,20 @@ class CoreTests(unittest.TestCase):
             self.assertEqual(settings.load(path), {})
 
 class ApiTests(unittest.TestCase):
+    def test_provider_errors(self):
+        cases = [
+            ('https://europe.api.riotgames.com/test', {}, 'Riot (HTTP 403): Chiave rifiutata'),
+            ('https://www.googleapis.com/test?key=SECRET', {'error': {'errors': [{'reason': 'accessNotConfigured'}]}}, 'Abilita YouTube Data API v3'),
+            ('https://www.googleapis.com/test?key=SECRET', {'error': {'details': [{'reason': 'API_KEY_SERVICE_BLOCKED'}]}}, 'restrizioni della chiave'),
+            ('https://www.googleapis.com/test?key=SECRET', {'error': {'errors': [{'reason': 'quotaExceeded'}]}}, 'Quota YouTube esaurita')]
+        for url, body, expected in cases:
+            def denied(*args, **kwargs):
+                raise HTTPError(url, 403, 'SECRET', {}, io.BytesIO(json.dumps(body).encode()))
+            with self.assertRaises(ApiError) as error:
+                Http(denied).get(url)
+            self.assertIn(expected, str(error.exception))
+            self.assertNotIn('SECRET', str(error.exception))
+
     def test_retry_and_redaction(self):
         calls, sleeps = [], []
         def opener(request, timeout):
