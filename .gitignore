@@ -7,3 +7,5 @@ build/
 dist/
 *.spec
 Riot API.txt
+tools/
+downloads/

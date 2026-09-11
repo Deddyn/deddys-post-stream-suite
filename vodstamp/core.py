@@ -53,6 +53,8 @@ class Row:
     title: str
     note: str = ''
     selected: bool = True
+    raw_seconds: int = 0
+    duration: int = 0
 
 def match_row(match, owners, start, end, offset=0):
     info = match['info']
@@ -81,7 +83,11 @@ def match_row(match, owners, start, end, offset=0):
     seconds = int((when - start).total_seconds()) + offset
     if seconds < 0:
         note = (note + ' Offset negativo: timestamp limitato a zero.').strip()
-    return Row(match['metadata']['matchId'], owners[me['puuid']], max(0, seconds), title, note)
+    duration = int(info.get('gameDuration', 0))
+    if info.get('gameEndTimestamp', 0) > info['gameStartTimestamp']:
+        duration = int((info['gameEndTimestamp'] - info['gameStartTimestamp']) / 1000)
+    return Row(match['metadata']['matchId'], owners[me['puuid']], max(0, seconds), title, note,
+               raw_seconds=int((when - start).total_seconds()), duration=duration)
 
 def output(rows):
     return '\n'.join(f'{stamp(r.seconds)} - {r.title}' for r in rows if r.selected)

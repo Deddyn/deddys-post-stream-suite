@@ -17,6 +17,18 @@ Nessuna preferenza viene caricata o salvata. URL, Start, End e risultati riparto
 
 ## Diagnostica e limiti
 
+### Download Twitch
+
+Inserisci Twitch VOD URL e Twitch offset (in seconds). La colonna Download sostituisce Verifica, con un pulsante per partita attivo solo con URL Twitch valido e offset intero. Non è necessario includere la partita nei timestamp per scaricarla.
+
+Il pulsante apre un ritaglio modificabile: inizio partita meno 10 secondi, fine partita più 20 secondi. La durata proviene dai dati Riot, non dalla partita successiva. Se manca la durata, il download non viene proposto. Scegli un nuovo file MP4; i file esistenti non vengono sovrascritti. Un download alla volta, con stato nella finestra. Non chiudere l’app durante il download: il processo esterno potrebbe continuare e non verrebbe più monitorato. Un fallimento può lasciare file parziali.
+
+Twitch offset si somma all’istante della partita rispetto all’inizio YouTube, prima dei margini. Esempio: se Twitch è partito 30 secondi prima di YouTube, usa +30; se è partito 30 secondi dopo, usa -30. Non eredita Offset (in seconds), che riguarda solo i timestamp YouTube. I due link devono riferirsi alla stessa trasmissione; l’app non verifica automaticamente l’allineamento o eventuali tagli. Controlla il primo ritaglio. Gli intervalli negativi sono limitati a zero; gli intervalli interamente precedenti al VOD vengono rifiutati.
+
+CLI ufficiale 1.56.5 in tools/TwitchDownloaderCLI, archivio verificato con SHA-256 8b1b0695f2b1b6bf0d2535fab4b84032951cded8cf4078dfdf4d58e391c813a0. Sorgente: https://github.com/lay295/TwitchDownloader/releases/tag/1.56.5 . Usa FFmpeg già presente nella cartella Downloads/TwitchDownloaderGUI-1.56.5-Windows-x64. Il programma grafico non viene modificato. Binari esclusi da Git: su un’altra macchina occorre ripristinare questi percorsi.
+
+La CLI seleziona la qualità migliore disponibile e usa trim Exact. Il flusso attuale supporta VOD accessibili senza OAuth; VOD privati, riservati o eliminati possono fallire. I test automatici verificano calcoli, pulsanti e argomenti del processo; un download reale richiede un VOD Twitch accessibile.
+
 Test Riot verifica Account-v1, cronologia e dettaglio Match-v5 per gli account preconfigurati Deddy#616, Toni Bonji#PALLE e Bubbals#EUW. I rapporti non contengono chiavi. I test non salvano risultati o preferenze.
 
 YouTube viene letto tramite i metadati pubblici liveBroadcastDetails della pagina, senza scaricare video né eseguire script. Servono startTimestamp ed endTimestamp validi. Consenso, login, blocchi o modifiche della pagina possono impedire la lettura: l’app segnala il problema senza inventare orari. Non viene usata la data di pubblicazione.
