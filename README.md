@@ -1,6 +1,11 @@
 # Deddy’s Post Stream Suite
 
-A Windows desktop tool for League of Legends streamers: generate YouTube timestamps from your matches and download individual games from YouTube or Twitch VODs.
+A simple Windows desktop tool for League of Legends streamers: generate YouTube timestamps and download individual games from YouTube or Twitch VODs URLs.
+
+<img width="937" height="835" alt="image" src="https://github.com/user-attachments/assets/7e3d2fd5-fd07-4555-b54b-365c7e0470a5" />
+
+Simply paste your Youtube or Twitch Stream URL to generate timestamps or download VODs easily.
+The tool checks the time of each match from your match history (with a free Riot API Key), it also checks the start and end of your streams to generate timestamps, and lets you download each of your matches individually.
 
 ## Quick start — Windows 10/11, 64-bit
 
