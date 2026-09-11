@@ -33,8 +33,8 @@ class Http:
                         error.close()
                         self.sleep(delay)
                         continue
-                messages = {401: 'Credenziali non valide.', 403: 'Accesso negato: verifica key, scadenza, API abilitata e quota.', 404: 'Account o risorsa non trovata.', 429: 'Limite API raggiunto. Riprova più tardi.'}
-                message = messages.get(error.code, 'Servizio non disponibile.')
+                messages = {401: 'Invalid credentials.', 403: 'Access denied: check key, expiry, API access and quota.', 404: 'Account or resource not found.', 429: 'API rate limit reached. Try again later.'}
+                message = messages.get(error.code, 'Service unavailable.')
                 if provider == 'Riot' and error.code in (401, 403):
                     try:
                         body = error.read(65536)
@@ -48,13 +48,13 @@ class Http:
                     html = 'text/html' in response_headers.get('Content-Type', '').lower() or body.lstrip().lower().startswith((b'<!doctype html', b'<html'))
                     challenge = response_headers.get('cf-mitigated', '').lower() == 'challenge'
                     if challenge:
-                        message = 'Protezione Cloudflare: richiesta di verifica interattiva. Questa risposta non verifica la validità della chiave. Confronta il test dal portale con la stessa chiave e segnala il blocco al supporto Riot.'
+                        message = 'Cloudflare requires an interactive verification. This does not establish key validity. Test the same key in the Riot portal and report the block to Riot support.'
                     elif html:
-                        message = 'Ricevuta una pagina HTML di accesso negato, non una risposta JSON Riot. Possibile filtro web o intermediario di rete; non prova che la chiave sia errata. Verifica eventuali VPN/proxy e confronta il test dal portale con la stessa chiave.'
+                        message = 'Received an HTML access-denied page, not a Riot JSON response. A web filter or network intermediary may be involved. Check VPN/proxy settings and test the same key in the portal.'
                     elif isinstance(payload, dict) and isinstance(payload.get('status'), dict):
-                        message = 'Riot restituisce un rifiuto JSON di autorizzazione. Il codice non distingue chiave errata, revocata o altri problemi di accesso. Confronta la stessa chiave attuale nel portale e nell’app; il precedente 200 potrebbe riguardare una chiave diversa.'
+                        message = 'Riot returned a JSON authorization denial. This does not distinguish invalid/revoked keys from other access issues. Compare the same current key in the portal and app.'
                     else:
-                        message = 'Accesso negato con risposta non riconosciuta. Non è possibile attribuirlo alla chiave. Confronta la stessa chiave attuale nel portale Riot e nell’app.'
+                        message = 'Access denied with an unrecognized response. Key validity is unknown. Compare the same current key in the Riot portal and app.'
                 if provider == 'YouTube':
                     # Interpret only known codes; never display response text or URLs containing keys.
                     try:
@@ -63,22 +63,22 @@ class Http:
                     except (ValueError, KeyError, TypeError, AttributeError, OSError):
                         reasons = []
                     hints = {
-                        'accessNotConfigured': 'Abilita YouTube Data API v3 nel progetto Google Cloud della chiave e riprova dopo qualche minuto.',
-                        'SERVICE_DISABLED': 'Abilita YouTube Data API v3 nel progetto Google Cloud della chiave e riprova dopo qualche minuto.',
-                        'quotaExceeded': 'Quota YouTube esaurita. Attendi il ripristino oppure usa Manuale.',
-                        'dailyLimitExceeded': 'Quota YouTube esaurita. Attendi il ripristino oppure usa Manuale.',
-                        'keyInvalid': 'YouTube API key non valida. Ricopiala dalle credenziali Google Cloud.',
-                        'API_KEY_INVALID': 'YouTube API key non valida. Ricopiala dalle credenziali Google Cloud.',
-                        'API_KEY_SERVICE_BLOCKED': 'Le restrizioni della chiave devono consentire YouTube Data API v3.',
-                        'API_KEY_HTTP_REFERRER_BLOCKED': 'La chiave è limitata a siti web. Per questa app desktop modifica le restrizioni applicazione della chiave.',
-                        'ipRefererBlocked': 'Le restrizioni applicazione della chiave bloccano questo computer. Controllale in Google Cloud.'}
+                        'accessNotConfigured': 'Enable YouTube Data API v3 in the key’s Google Cloud project and retry after a few minutes.',
+                        'SERVICE_DISABLED': 'Enable YouTube Data API v3 in the key’s Google Cloud project and retry after a few minutes.',
+                        'quotaExceeded': 'YouTube quota exhausted. Wait for the quota to reset.',
+                        'dailyLimitExceeded': 'YouTube quota exhausted. Wait for the quota to reset.',
+                        'keyInvalid': 'Invalid YouTube API key. Copy it again from Google Cloud credentials.',
+                        'API_KEY_INVALID': 'Invalid YouTube API key. Copy it again from Google Cloud credentials.',
+                        'API_KEY_SERVICE_BLOCKED': 'Key restrictions must allow YouTube Data API v3.',
+                        'API_KEY_HTTP_REFERRER_BLOCKED': 'The key is restricted to websites. Update application restrictions for desktop use.',
+                        'ipRefererBlocked': 'Key application restrictions block this computer. Check them in Google Cloud.'}
                     message = next((hints[r] for r in reasons if r in hints), message)
                 error.close()
                 raise ApiError(f'{provider} (HTTP {error.code}): {message}') from None
             except (URLError, socket.timeout, TimeoutError, OSError):
-                raise ApiError('Connessione fallita. Verifica rete e riprova.') from None
+                raise ApiError('Connection failed. Check your network and retry.') from None
             except (ValueError, UnicodeError):
-                raise ApiError('Risposta API non valida.') from None
+                raise ApiError('Invalid API response.') from None
 
 def youtube_range(http, url, key):
     if not key:
@@ -95,12 +95,12 @@ def youtube_range(http, url, key):
             raise ValueError()
         return start, end
     except (KeyError, IndexError, TypeError, ValueError):
-        raise ApiError('Inizio/fine live non disponibili. VOD privato, non-live o live in corso: usa Manuale.') from None
+        raise ApiError('Stream start/end unavailable. The video may be private, not a livestream, or still live.') from None
 
 class Riot:
     def __init__(self, http, key):
         if not key:
-            raise ApiError('Inserisci Riot Personal API Key.')
+            raise ApiError('Enter your Riot Personal API Key.')
         self.http, self.key = http, key
 
     def get(self, path, **params):
@@ -122,7 +122,7 @@ class Riot:
                 page += 100
         rows = []
         for index, mid in enumerate(sorted(ids)):
-            progress(f'Partita {index + 1}/{len(ids)}')
+            progress(f'Match {index + 1}/{len(ids)}')
             row = match_row(self.get('/lol/match/v5/matches/' + quote(mid, safe='')), owners, start, end, offset)
             if row:
                 rows.append(row)

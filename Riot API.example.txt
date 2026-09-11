@@ -1,0 +1,1 @@
+Replace this line with your own Riot API key and save as Riot API.txt.

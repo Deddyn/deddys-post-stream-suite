@@ -5,21 +5,21 @@ from .api import Http, Riot, ApiError, youtube_range
 
 def diagnose(provider, key, accounts='', url='', http=None):
     report = []
-    stage = 'Configurazione'
+    stage = 'Configuration'
     try:
         if not key.strip() and provider != 'YouTube':
-            raise ValueError('Inserisci la chiave nel campo dedicato.')
+            raise ValueError('Enter your key in Riot API.txt.')
         if any(c.isspace() for c in key.strip()):
-            raise ValueError('La chiave contiene spazi o ritorni a capo interni. Ricopiala dal portale.')
+            raise ValueError('The key contains internal whitespace. Copy it again from the portal.')
         http = http or Http()
         if provider == 'YouTube':
-            stage = 'YouTube: ' + ('accesso API' if key.strip() else 'pagina pubblica senza chiave') + ' e metadati del VOD'
+            stage = 'YouTube: ' + ('API access' if key.strip() else 'public page without a key') + ' and VOD metadata'
             start, end = youtube_range(http, url, key.strip())
-            report.append(f'OK — {stage}.\nInizio: {start.isoformat()}\nFine: {end.isoformat()}')
+            report.append(f'OK — {stage}.\nStart: {start.isoformat()}\nEnd: {end.isoformat()}')
         else:
             names = [a.strip() for a in accounts.split(';') if a.strip()]
             if not names or any('#' not in a or not all(a.rsplit('#', 1)) for a in names):
-                raise ValueError('Inserisci almeno un account Nome#TAG, separando gli account con ;')
+                raise ValueError('Enter at least one Name#TAG account; separate accounts with ;')
             riot = Riot(http, key.strip())
             for index, account in enumerate(names, 1):
                 # Index rather than user text prevents accidentally pasted secrets entering reports.
@@ -27,22 +27,22 @@ def diagnose(provider, key, accounts='', url='', http=None):
                 name, tag = account.rsplit('#', 1)
                 data = riot.get('/riot/account/v1/accounts/by-riot-id/' + quote(name, safe='') + '/' + quote(tag, safe=''))
                 puuid = data['puuid']
-                report.append(f'OK — {stage}: account trovato, chiave accettata.')
-                stage = f'Riot Match-v5 EUROPE — cronologia account {index}'
+                report.append(f'OK — {stage}: account found, key accepted.')
+                stage = f'Riot Match-v5 EUROPE — match history for account {index}'
                 ids = riot.get('/lol/match/v5/matches/by-puuid/' + quote(puuid, safe='') + '/ids', start=0, count=1)
-                report.append(f'OK — {stage}: accesso consentito.')
+                report.append(f'OK — {stage}: access granted.')
                 if ids:
-                    stage = f'Riot Match-v5 EUROPE — dettaglio partita account {index}'
+                    stage = f'Riot Match-v5 EUROPE — match details for account {index}'
                     detail = riot.get('/lol/match/v5/matches/' + quote(ids[0], safe=''))
                     if 'info' not in detail:
-                        raise ValueError('Dettaglio partita incompleto.')
-                    report.append(f'OK — {stage}: leggibile.')
+                        raise ValueError('Incomplete match details.')
+                    report.append(f'OK — {stage}: readable.')
                 else:
-                    report.append('INFO — Nessuna partita recente: test dettaglio non eseguito. Non indica una chiave errata.')
-            report.append('Il test Riot non usa la data del VOD: verifica credenziali e accesso ai servizi separatamente.')
+                    report.append('INFO — No recent matches: detail test skipped. This does not mean the key is invalid.')
+            report.append('The Riot test does not use the VOD date: it checks credentials and API access separately.')
     except (ApiError, ValueError) as error:
-        report.append(f'ERRORE — {stage}\n{error}')
+        report.append(f'ERROR — {stage}\n{error}')
     except Exception:
-        report.append(f'ERRORE — {stage}\nRisposta inattesa. Riprova; nessun dato sensibile incluso nel rapporto.')
+        report.append(f'ERROR — {stage}\nUnexpected response. Retry; no sensitive data is included in this report.')
     result = '\n\n'.join(report)
-    return result.replace(key.strip(), '[chiave nascosta]') if key.strip() else result
+    return result.replace(key.strip(), '[key hidden]') if key.strip() else result

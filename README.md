@@ -1,58 +1,74 @@
-# LoL VOD Timestamps — Windows
+# Deddy’s Post Stream Suite
 
-## Avvio
+A Windows desktop tool for League of Legends streamers: generate YouTube timestamps from your matches and download individual games from YouTube or Twitch VODs.
 
-Apri start.cmd. Serve Python 3.11+ con Tkinter e tzdata; il launcher supporta anche il runtime incluso in Codex.
+## Quick start — Windows 10/11, 64-bit
 
-Metti soltanto la chiave Riot nel file `Riot API.txt` accanto a start.cmd, salvato in UTF-8. L’app legge il file all’avvio e prima di ogni generazione o test Riot. Il campo è mascherato e non modificabile: per cambiare chiave modifica il file. Il file è escluso da Git, ma resta un file locale in chiaro: non includerlo quando condividi la cartella.
+1. Open this repository’s **Releases** page and download the Windows ZIP asset, not GitHub’s automatic “Source code” ZIP.
+2. Right-click the ZIP, choose **Extract All**, and keep the whole extracted folder together. Do not run the app inside the ZIP.
+3. Create `Riot API.txt` next to `DeddysPostStreamSuite.exe`, or rename `Riot API.example.txt`. Paste only your own key into that file, save as UTF-8, and close the editor. Make sure Windows has not named it `Riot API.txt.txt`.
+4. Open `DeddysPostStreamSuite.exe`. Python is included. The release also contains TwitchDownloaderCLI, yt-dlp, FFmpeg/FFprobe and Deno; no separate setup is needed.
+5. Replace the example EUW accounts with yours, using `Name#TAG; OtherName#TAG`. This version supports **EUW accounts**, not every Riot server.
+6. Choose your city’s timezone and enter the YouTube link to a **public, completed livestream VOD**.
+7. Click **Generate timestamps**. Start and End fill automatically. Review titles, include/exclude rows and click **Copy**.
 
-1. Inserisci il link YouTube del VOD pubblico di una live conclusa.
-2. Premi Test YouTube per compilare Start ed End, oppure direttamente Genera timestamp.
-3. Controlla le righe e modifica i titoli con doppio clic. Spazio include/esclude le righe.
-4. Premi Copia.
+The application is unsigned. Windows may display a publisher warning. Verify that your ZIP came from this repository’s release and compare its SHA-256 with the published checksum; do not disable antivirus protection.
 
-Start ed End sono automatici e non modificabili, in formato GG-MM-AAAA HH:MM:SS, nella timezone indicata (Europe/Rome predefinita). Offset (in seconds) sposta i timestamp: positivo avanti, negativo indietro. La chiave YouTube e la durata manuale non sono richieste.
+## Get your own Riot API key
 
-Nessuna preferenza viene caricata o salvata. URL, Start, End e risultati ripartono vuoti; offset, timezone e i tre account EUW ripartono dai valori predefiniti. Gli eventuali vecchi settings.json non vengono più utilizzati.
+1. Open the [Riot Developer Portal](https://developer.riotgames.com/) and sign in with your Riot account.
+2. Choose [Register Product](https://developer.riotgames.com/app-type), then the personal-project option for your own private use.
+3. Select League of Legends/Standard APIs where requested. Provide a truthful description of your use, the repository URL and any other requested details.
+4. Submit the application. Check its messages/status in the portal and answer any questions from Riot. Approval is not guaranteed.
+5. Once approved, open your registered project and copy its **Personal API Key** into the local `Riot API.txt` file.
+6. Click **Test Riot** in the app. It checks account lookup, match history and one recent match for each configured account.
 
-## Diagnostica e limiti
+Example description to adapt truthfully: “I use this desktop tool privately to match my EUW League of Legends games to my livestream VODs, create timestamps, and trim recordings of my own games.”
 
-### Download YouTube
+The portal’s temporary **Development Key expires every 24 hours**. Personal keys are intended for personal/private use, while public-facing products require appropriate Riot approval and production access. A public source repository does not itself grant permission to operate a public API service. Never distribute your key or assume that individual keys remove Riot’s policy requirements. See [Riot’s key and registration guidance](https://developer.riotgames.com/docs/portal).
 
-La colonna Download contiene due pulsanti: Youtube e Twitch, abilitati separatamente in base al link e all’offset della piattaforma. Entrambi propongono la durata Riot con 10 secondi prima e 20 dopo, modificabili prima del salvataggio. Un solo download alla volta.
+The underlined **Riot Personal API Key** label opens the application page. The tool reads the file at launch and before generating/testing, so you can replace an expired key without changing code. Keys are masked in the UI, excluded from Git and release packaging, and never included in diagnostic reports. The local text file is unencrypted: do not share it or include it in screenshots/ZIPs.
 
-Youtube usa il file `yt-dlp` fornito accanto a start.cmd, avviato con lo stesso Python dell’app, e FFmpeg già disponibile. Non richiede pip. Se presente, usa Deno in `%USERPROFILE%/.deno/bin/deno.exe`. Il ritaglio usa download-sections e force-keyframes-at-cuts: la ricodifica può richiedere tempo. Output MP4, nessuna sovrascrittura, configurazioni esterne yt-dlp ignorate. Il nome proposto include la piattaforma.
+## Fields and timestamps
 
-L’offset YouTube viene applicato all’inizio grezzo della partita, indipendentemente dall’offset Twitch. La lettura dei metadati e il download sono operazioni distinte: un VOD leggibile può comunque non essere scaricabile. Blocchi YouTube, login o dipendenze richieste da nuove versioni vengono riportati nel messaggio di errore. Non vengono letti automaticamente cookie del browser. Documentazione: https://github.com/yt-dlp/yt-dlp#usage-and-options
+- **YouTube URL:** required to determine the stream interval. No YouTube API key is needed. The app reads public livestream metadata; it never substitutes the upload date. Consent pages, private videos, ongoing streams or website changes can prevent this.
+- **Twitch URL:** optional, and must refer to the same broadcast. It enables the Twitch download buttons.
+- **Start / End:** automatically displayed as `DD-MM-YYYY HH:MM:SS` in your selected timezone.
+- **Timezone:** city-based entries show GMT offsets, including seasonal offsets. Conversion uses the stream date and automatically handles daylight-saving time. Fractional offsets and fixed GMT options are available; choose a city for automatic seasonal adjustment.
+- **YouTube offset:** seconds added to match timestamps and YouTube trims.
+- **Twitch offset:** separate seconds added to the match’s position relative to YouTube’s stream start. If Twitch started 30 seconds earlier, use `+30`; if 30 seconds later, use `-30`. It does not inherit the YouTube offset.
 
-### Download Twitch
+No settings or match results persist between launches. Links and dates start empty; offsets, timezone and example accounts return to their defaults. Your key file stays in place. Updates: extract the new release into a new folder and copy your private `Riot API.txt` into it.
 
-Inserisci Twitch VOD URL e Twitch offset (in seconds). La colonna Download sostituisce Verifica, con un pulsante per partita attivo solo con URL Twitch valido e offset intero. Non è necessario includere la partita nei timestamp per scaricarla.
+## Review and download matches
 
-Il pulsante apre un ritaglio modificabile: inizio partita meno 10 secondi, fine partita più 20 secondi. La durata proviene dai dati Riot, non dalla partita successiva. Se manca la durata, il download non viene proposto. Scegli un nuovo file MP4; i file esistenti non vengono sovrascritti. Un download alla volta, con stato nella finestra. Non chiudere l’app durante il download: il processo esterno potrebbe continuare e non verrebbe più monitorato. Un fallimento può lasciare file parziali.
+All queues are included. Games starting within `[stream start, stream end)` are deduplicated across accounts and sorted chronologically. A match already running when the stream began is excluded. The timestamp marks game start, not champion select. Riot may not provide very old match histories.
 
-Twitch offset si somma all’istante della partita rispetto all’inizio YouTube, prima dei margini. Esempio: se Twitch è partito 30 secondi prima di YouTube, usa +30; se è partito 30 secondi dopo, usa -30. Non eredita Offset (in seconds), che riguarda solo i timestamp YouTube. I due link devono riferirsi alla stessa trasmissione; l’app non verifica automaticamente l’allineamento o eventuali tagli. Controlla il primo ritaglio. Gli intervalli negativi sono limitati a zero; gli intervalli interamente precedenti al VOD vengono rifiutati.
+Summoner’s Rift CLASSIC matchups use Riot’s estimated role. Lane swaps can be wrong; unknown opponents appear as `Champion vs ?`. Other modes use `Champion - Mode`. Double-click a title to edit it. Space or the include/exclude buttons control copied timestamps. If several configured accounts occur in one match, the first listed account present takes priority.
 
-CLI ufficiale 1.56.5 in tools/TwitchDownloaderCLI, archivio verificato con SHA-256 8b1b0695f2b1b6bf0d2535fab4b84032951cded8cf4078dfdf4d58e391c813a0. Sorgente: https://github.com/lay295/TwitchDownloader/releases/tag/1.56.5 . Usa FFmpeg già presente nella cartella Downloads/TwitchDownloaderGUI-1.56.5-Windows-x64. Il programma grafico non viene modificato. Binari esclusi da Git: su un’altra macchina occorre ripristinare questi percorsi.
+Each row has **Youtube** and **Twitch** buttons. Click one to review the proposed trim: 10 seconds before game start and 20 seconds after its Riot-reported end. Edit the start/end seconds if needed, then choose a new MP4 filename. Existing files are not overwritten. Downloading does not require that row to be included in the timestamp list.
 
-La CLI seleziona la qualità migliore disponibile e usa trim Exact. Il flusso attuale supporta VOD accessibili senza OAuth; VOD privati, riservati o eliminati possono fallire. I test automatici verificano calcoli, pulsanti e argomenti del processo; un download reale richiede un VOD Twitch accessibile.
+One download runs at a time. Progress appears in the main window; keep it open until completion. Accurate YouTube cuts can require re-encoding. The app does not automatically access browser cookies or private/subscriber-only VODs. A failed download may leave partial files. Cropped VODs or multiple cuts may require more than a constant offset; check your first clip manually.
 
-Test Riot verifica Account-v1, cronologia e dettaglio Match-v5 per gli account preconfigurati Deddy#616, Toni Bonji#PALLE e Bubbals#EUW. I rapporti non contengono chiavi. I test non salvano risultati o preferenze.
+## Troubleshooting
 
-YouTube viene letto tramite i metadati pubblici liveBroadcastDetails della pagina, senza scaricare video né eseguire script. Servono startTimestamp ed endTimestamp validi. Consenso, login, blocchi o modifiche della pagina possono impedire la lettura: l’app segnala il problema senza inventare orari. Non viene usata la data di pubblicazione.
+- **Missing key:** create the UTF-8 file next to the executable, not inside `_internal`.
+- **Riot 403:** run Test Riot and compare the same current key in the official portal. A 403 alone does not prove a typo; the app distinguishes recognizable API denials from web protection responses.
+- **Riot 404:** check Riot ID spelling, tag and EUW region.
+- **Rate limit:** let the app wait or retry later. It respects bounded Retry-After delays.
+- **YouTube metadata unavailable:** confirm the URL belongs to a completed public live, not a regular upload.
+- **Downloader missing:** extract the entire release, including `tools`. Moving only the main executable is insufficient.
+- **Download failed:** check the visible error and whether the VOD is still public/available. Website changes can require an updated release.
+- **Wrong times:** choose the correct city and verify each platform’s offset separately.
 
-Tutte le queue sono incluse. Gli ID vengono paginati, deduplicati e ordinati. Sono incluse le partite iniziate nell’intervallo [Start, End), usando gameStartTimestamp. Match precedenti alla live sono esclusi. Riot potrebbe non restituire cronologie molto vecchie.
+## Development and releases
 
-Su Summoner’s Rift CLASSIC il matchup usa teamPosition: è una stima Riot e può non riflettere lane swap. In caso incerto compare Champion vs ?. Altre modalità usano Champion - modalità. Più account nello stesso match producono una sola riga, con priorità al primo account configurato presente e una nota di verifica.
+Python 3.11+ with Tkinter is required for source use. Run `python -m pip install -r requirements.txt`, restore the tools listed in `THIRD_PARTY_NOTICES.md`, and start with `python -m vodstamp`. Run tests from the repository root: `python -m unittest discover -s tests -v`.
 
-VOD ritagliati possono richiedere un offset; tagli multipli non si correggono con un unico offset. Il formato copiato è una lista timestamp, senza capitolo iniziale artificiale.
+For source setup, run `powershell -File restore_tools.ps1` to fetch the pinned tools and verify hashes. For a release build, install `pyinstaller==6.22.2`, then run `python build_release.py --version 1.0.0`. The build uses an explicit allowlist and never copies the developer’s working folder wholesale. `Riot API.txt`, downloaded videos, tools and build output are excluded from Git. Only the release ZIP contains the standalone tools.
 
-## Test
+## Credits and licenses
 
-Dalla cartella: `py -3 -m unittest discover -s tests -v`. Test offline con credenziali fittizie. I test GUI richiedono Tkinter. Le API reali si verificano con i pulsanti dell’app.
+Created for Deddy’s streaming workflow. Thanks to [TwitchDownloader](https://github.com/lay295/TwitchDownloader), [yt-dlp](https://github.com/yt-dlp/yt-dlp), [FFmpeg](https://ffmpeg.org/), [Gyan’s Windows builds](https://www.gyan.dev/ffmpeg/builds/), [Deno](https://deno.com/), Python, Tcl/Tk, IANA/tzdata and PyInstaller. See [third-party notices](THIRD_PARTY_NOTICES.md) and the license files shipped with the release. Third-party components retain their own licenses.
 
-Moduli: core.py (match e date), api.py (API), youtube_public.py (pagina pubblica), credentials.py (file chiave), diagnostics.py (test API), gui.py (interfaccia). settings.py rimane solo per compatibilità con i test precedenti, non è usato dall’app.
-
-Fonti: https://developer.riotgames.com/apis/ e https://github.com/yt-dlp/yt-dlp/issues/489
-
-Progetto personale non affiliato a Riot Games o YouTube.
+This project is not endorsed by Riot Games and does not reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games and League of Legends are trademarks or registered trademarks of Riot Games, Inc. This project is not affiliated with Twitch or YouTube.

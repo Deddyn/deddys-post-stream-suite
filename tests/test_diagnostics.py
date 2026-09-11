@@ -9,9 +9,9 @@ class DiagnosticTests(unittest.TestCase):
         from urllib.error import HTTPError
         from vodstamp.api import Http
         cases = [
-            ({'Content-Type': 'text/html'}, b'<html>secret</html>', 'pagina HTML'),
-            ({'cf-mitigated': 'challenge'}, b'secret', 'Protezione Cloudflare'),
-            ({}, b'{"status":{"message":"secret","status_code":403}}', 'rifiuto JSON'),
+            ({'Content-Type': 'text/html'}, b'<html>secret</html>', 'HTML access-denied page'),
+            ({'cf-mitigated': 'challenge'}, b'secret', 'Cloudflare requires'),
+            ({}, b'{"status":{"message":"secret","status_code":403}}', 'JSON authorization denial'),
         ]
         for headers, body, expected in cases:
             def opener(request, timeout):
@@ -36,25 +36,25 @@ class DiagnosticTests(unittest.TestCase):
         class Fake:
             def get(self, url, headers=None):
                 if 'by-riot-id' in url: return {'puuid': 'p'}
-                raise ApiError('Riot (HTTP 403): accesso negato')
+                raise ApiError('Riot (HTTP 403): access denied')
         report = diagnose('Riot', 'secret', 'Deddy#616', http=Fake())
-        self.assertIn('chiave accettata', report)
-        self.assertIn('ERRORE — Riot Match-v5', report)
+        self.assertIn('key accepted', report)
+        self.assertIn('ERROR — Riot Match-v5', report)
 
     def test_empty_history_is_not_bad_key(self):
         class Fake:
             def get(self, url, headers=None):
                 return {'puuid': 'p'} if 'by-riot-id' in url else []
         report = diagnose('Riot', 'secret', 'Deddy#616', http=Fake())
-        self.assertNotIn('ERRORE', report)
-        self.assertIn('test dettaglio non eseguito', report)
+        self.assertNotIn('ERROR', report)
+        self.assertIn('detail test skipped', report)
 
     def test_youtube_and_missing_key(self):
         class Fake:
             def get(self, url):
                 return {'items':[{'liveStreamingDetails':{'actualStartTime':'2026-09-11T12:00:00Z','actualEndTime':'2026-09-11T13:00:00Z'}}]}
         self.assertIn('OK — YouTube', diagnose('YouTube', 'secret', url='https://youtu.be/abcdefghijk', http=Fake()))
-        self.assertIn('Inserisci la chiave', diagnose('Riot', ''))
+        self.assertIn('Enter your key', diagnose('Riot', ''))
 
     def test_secret_redacted_from_errors(self):
         class Fake:

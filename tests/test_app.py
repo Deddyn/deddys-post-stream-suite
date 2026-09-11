@@ -45,7 +45,7 @@ class CoreTests(unittest.TestCase):
         self.assertIsNotNone(match_row(match(seconds=0), {'p':'a'}, START, end))
         self.assertEqual(match_row(match(mode='ARAM'), {'p':'a'}, START, end).title, 'Jax - ARAM')
         self.assertEqual(match_row(match(role=''), {'p':'a'}, START, end).title, 'Jax vs ?')
-        self.assertIn('Più account', match_row(match(), {'p':'a','q':'b'}, START, end).note)
+        self.assertIn('Multiple accounts', match_row(match(), {'p':'a','q':'b'}, START, end).note)
         self.assertEqual(stamp(90061), '25:01:01')
         self.assertEqual(match_row(match(), {'p':'a'}, START, end, -120).seconds, 0)
 
@@ -61,10 +61,10 @@ class CoreTests(unittest.TestCase):
 class ApiTests(unittest.TestCase):
     def test_provider_errors(self):
         cases = [
-            ('https://europe.api.riotgames.com/test', {}, 'Riot (HTTP 403): Accesso negato'),
-            ('https://www.googleapis.com/test?key=SECRET', {'error': {'errors': [{'reason': 'accessNotConfigured'}]}}, 'Abilita YouTube Data API v3'),
-            ('https://www.googleapis.com/test?key=SECRET', {'error': {'details': [{'reason': 'API_KEY_SERVICE_BLOCKED'}]}}, 'restrizioni della chiave'),
-            ('https://www.googleapis.com/test?key=SECRET', {'error': {'errors': [{'reason': 'quotaExceeded'}]}}, 'Quota YouTube esaurita')]
+            ('https://europe.api.riotgames.com/test', {}, 'Riot (HTTP 403): Access denied'),
+            ('https://www.googleapis.com/test?key=SECRET', {'error': {'errors': [{'reason': 'accessNotConfigured'}]}}, 'Enable YouTube Data API v3'),
+            ('https://www.googleapis.com/test?key=SECRET', {'error': {'details': [{'reason': 'API_KEY_SERVICE_BLOCKED'}]}}, 'Key restrictions'),
+            ('https://www.googleapis.com/test?key=SECRET', {'error': {'errors': [{'reason': 'quotaExceeded'}]}}, 'YouTube quota exhausted')]
         for url, body, expected in cases:
             def denied(*args, **kwargs):
                 raise HTTPError(url, 403, 'SECRET', {}, io.BytesIO(json.dumps(body).encode()))
