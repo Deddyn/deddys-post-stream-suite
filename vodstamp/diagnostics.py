@@ -7,15 +7,15 @@ def diagnose(provider, key, accounts='', url='', http=None):
     report = []
     stage = 'Configurazione'
     try:
-        if not key.strip():
+        if not key.strip() and provider != 'YouTube':
             raise ValueError('Inserisci la chiave nel campo dedicato.')
         if any(c.isspace() for c in key.strip()):
             raise ValueError('La chiave contiene spazi o ritorni a capo interni. Ricopiala dal portale.')
         http = http or Http()
         if provider == 'YouTube':
-            stage = 'YouTube: accesso API e metadati del VOD'
+            stage = 'YouTube: ' + ('accesso API' if key.strip() else 'pagina pubblica senza chiave') + ' e metadati del VOD'
             start, end = youtube_range(http, url, key.strip())
-            report.append(f'OK — YouTube: accesso e metadati live.\nInizio: {start.isoformat()}\nFine: {end.isoformat()}')
+            report.append(f'OK — {stage}.\nInizio: {start.isoformat()}\nFine: {end.isoformat()}')
         else:
             names = [a.strip() for a in accounts.split(';') if a.strip()]
             if not names or any('#' not in a or not all(a.rsplit('#', 1)) for a in names):

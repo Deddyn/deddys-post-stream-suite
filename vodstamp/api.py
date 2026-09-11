@@ -82,7 +82,11 @@ class Http:
 
 def youtube_range(http, url, key):
     if not key:
-        raise ApiError('Serve YouTube API key. In alternativa scegli Manuale.')
+        from .youtube_public import public_range
+        try:
+            return public_range(video_id(url))
+        except ValueError as error:
+            raise ApiError(str(error)) from None
     data = http.get('https://www.googleapis.com/youtube/v3/videos?' + urlencode({'part': 'liveStreamingDetails', 'id': video_id(url), 'key': key}))
     try:
         details = data['items'][0]['liveStreamingDetails']

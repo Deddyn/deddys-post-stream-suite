@@ -92,7 +92,9 @@ class ApiTests(unittest.TestCase):
             def get(self, url):
                 return {'items':[{'liveStreamingDetails':{'actualStartTime':'2026-09-11T12:00:00Z','actualEndTime':'2026-09-11T13:00:00Z'}}]}
         self.assertEqual(youtube_range(Fake(), 'https://youtu.be/abcdefghijk', 'key')[0], START)
-        with self.assertRaises(ApiError): youtube_range(Fake(), 'https://youtu.be/abcdefghijk', '')
+        with patch('vodstamp.youtube_public.public_range', return_value=(START, START + timedelta(hours=1))) as public:
+            self.assertEqual(youtube_range(Fake(), 'https://youtu.be/abcdefghijk', '')[0], START)
+            public.assert_called_once_with('abcdefghijk')
         with patch.object(Fake, 'get', return_value={'items':[]}):
             with self.assertRaises(ApiError): youtube_range(Fake(), 'https://youtu.be/abcdefghijk', 'key')
 

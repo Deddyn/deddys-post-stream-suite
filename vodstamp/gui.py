@@ -40,7 +40,7 @@ class App:
                 button = ttk.Button(frame, text='Test ' + provider, command=lambda p=provider: self.test_api(p))
                 button.grid(row=index, column=2, padx=(8, 0))
                 self.test_buttons.append(button)
-        ttk.Label(frame, text='Le chiavi non vengono salvate. Doppio clic su una riga: modifica titolo. Spazio: includi/escludi.').grid(row=10, column=0, columnspan=2, sticky='w', pady=8)
+        ttk.Label(frame, text='YouTube key facoltativa: se vuota, legge la pagina pubblica. Doppio clic: modifica titolo. Spazio: includi/escludi.').grid(row=10, column=0, columnspan=2, sticky='w', pady=8)
         actions = ttk.Frame(frame)
         actions.grid(row=11, column=0, columnspan=2, sticky='ew')
         self.generate = ttk.Button(actions, text='Genera timestamp', command=self.run)
