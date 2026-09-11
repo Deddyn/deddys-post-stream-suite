@@ -86,8 +86,8 @@ This project is not endorsed by Riot Games and does not reflect the views or opi
 ## (For Italians) Piselloni come state?
 
 Spero che questa Repo possa essere utile a qualcuno, io l'ho creata principalmente per me e poter pubblicare più facilmente sui socials i games che ho giocato on stream. Se a qualcuno interessasse, questi sono i miei socials e contatti:
-Twitch: https://www.twitch.tv/deddy__
-YouTube: https://www.youtube.com/@DeddynYT
-TikTok: https://www.tiktok.com/@deddy__twtv
-Instagram: https://www.instagram.com/deddy_ttv/
-Discord: https://discord.gg/UCjksf3yJh
+- Twitch: https://www.twitch.tv/deddy__
+- YouTube: https://www.youtube.com/@DeddynYT
+- TikTok: https://www.tiktok.com/@deddy__twtv
+- Instagram: https://www.instagram.com/deddy_ttv/
+- Discord: https://discord.gg/UCjksf3yJh
