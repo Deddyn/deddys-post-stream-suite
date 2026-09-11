@@ -19,7 +19,9 @@ class Http:
         provider = 'Riot' if host.endswith('.api.riotgames.com') else ('YouTube' if host == 'www.googleapis.com' else 'API')
         for attempt in range(4):
             try:
-                with self.opener(Request(url, headers=headers or {}), timeout=25) as response:
+                request_headers = {'Accept': 'application/json', 'User-Agent': 'LoLVodTimestamps/1.0 (Windows desktop)'}
+                request_headers.update(headers or {})
+                with self.opener(Request(url, headers=request_headers), timeout=25) as response:
                     return json.load(response)
             except HTTPError as error:
                 if (error.code == 429 or error.code >= 500) and attempt < 3:
@@ -34,7 +36,25 @@ class Http:
                 messages = {401: 'Credenziali non valide.', 403: 'Accesso negato: verifica key, scadenza, API abilitata e quota.', 404: 'Account o risorsa non trovata.', 429: 'Limite API raggiunto. Riprova più tardi.'}
                 message = messages.get(error.code, 'Servizio non disponibile.')
                 if provider == 'Riot' and error.code in (401, 403):
-                    message = 'Chiave rifiutata o accesso non autorizzato. Apri Riot Developer Portal, copia la Personal API Key del progetto approvato e reinseriscila. Se usi una Development Key, verifica la scadenza e rigenerala se necessario.'
+                    try:
+                        body = error.read(65536)
+                    except OSError:
+                        body = b''
+                    try:
+                        payload = json.loads(body)
+                    except (ValueError, UnicodeError):
+                        payload = None
+                    response_headers = error.headers or {}
+                    html = 'text/html' in response_headers.get('Content-Type', '').lower() or body.lstrip().lower().startswith((b'<!doctype html', b'<html'))
+                    challenge = response_headers.get('cf-mitigated', '').lower() == 'challenge'
+                    if challenge:
+                        message = 'Protezione Cloudflare: richiesta di verifica interattiva. Questa risposta non verifica la validità della chiave. Confronta il test dal portale con la stessa chiave e segnala il blocco al supporto Riot.'
+                    elif html:
+                        message = 'Ricevuta una pagina HTML di accesso negato, non una risposta JSON Riot. Possibile filtro web o intermediario di rete; non prova che la chiave sia errata. Verifica eventuali VPN/proxy e confronta il test dal portale con la stessa chiave.'
+                    elif isinstance(payload, dict) and isinstance(payload.get('status'), dict):
+                        message = 'Riot restituisce un rifiuto JSON di autorizzazione. Il codice non distingue chiave errata, revocata o altri problemi di accesso. Confronta la stessa chiave attuale nel portale e nell’app; il precedente 200 potrebbe riguardare una chiave diversa.'
+                    else:
+                        message = 'Accesso negato con risposta non riconosciuta. Non è possibile attribuirlo alla chiave. Confronta la stessa chiave attuale nel portale Riot e nell’app.'
                 if provider == 'YouTube':
                     # Interpret only known codes; never display response text or URLs containing keys.
                     try:

@@ -4,6 +4,24 @@ from vodstamp.api import ApiError
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_riot_response_classification(self):
+        import io
+        from urllib.error import HTTPError
+        from vodstamp.api import Http
+        cases = [
+            ({'Content-Type': 'text/html'}, b'<html>secret</html>', 'pagina HTML'),
+            ({'cf-mitigated': 'challenge'}, b'secret', 'Protezione Cloudflare'),
+            ({}, b'{"status":{"message":"secret","status_code":403}}', 'rifiuto JSON'),
+        ]
+        for headers, body, expected in cases:
+            def opener(request, timeout):
+                self.assertEqual(request.get_header('Accept'), 'application/json')
+                self.assertIn('LoLVodTimestamps', request.get_header('User-agent'))
+                raise HTTPError(request.full_url, 403, '', headers, io.BytesIO(body))
+            report = diagnose('Riot', 'secret', 'Deddy#616', http=Http(opener))
+            self.assertIn(expected, report)
+            self.assertNotIn('secret', report)
+
     def test_riot_stages(self):
         class Fake:
             def get(self, url, headers=None):

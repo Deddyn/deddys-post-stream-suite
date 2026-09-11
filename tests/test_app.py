@@ -61,7 +61,7 @@ class CoreTests(unittest.TestCase):
 class ApiTests(unittest.TestCase):
     def test_provider_errors(self):
         cases = [
-            ('https://europe.api.riotgames.com/test', {}, 'Riot (HTTP 403): Chiave rifiutata'),
+            ('https://europe.api.riotgames.com/test', {}, 'Riot (HTTP 403): Accesso negato'),
             ('https://www.googleapis.com/test?key=SECRET', {'error': {'errors': [{'reason': 'accessNotConfigured'}]}}, 'Abilita YouTube Data API v3'),
             ('https://www.googleapis.com/test?key=SECRET', {'error': {'details': [{'reason': 'API_KEY_SERVICE_BLOCKED'}]}}, 'restrizioni della chiave'),
             ('https://www.googleapis.com/test?key=SECRET', {'error': {'errors': [{'reason': 'quotaExceeded'}]}}, 'Quota YouTube esaurita')]
