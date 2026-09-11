@@ -21,7 +21,11 @@ class App:
         root.minsize(850, 650)
         style = ttk.Style(root)
         style.theme_use('clam')
-        style.configure('Treeview', rowheight=29)
+        style.configure('Download.TButton', font=('Segoe UI', 9), padding=(4, 0))
+        probe = ttk.Button(root, text='Download', style='Download.TButton')
+        root.update_idletasks()
+        style.configure('Treeview', rowheight=max(34, probe.winfo_reqheight() + 6))
+        probe.destroy()
         frame = ttk.Frame(root, padding=18)
         frame.pack(fill='both', expand=True)
         frame.columnconfigure(1, weight=1)
@@ -35,14 +39,28 @@ class App:
         self.values['riot'] = tk.StringVar(value=initial_key)
         self.test_buttons = []
         ttk.Label(frame, text='Timestamp delle tue partite', font=('Segoe UI', 19, 'bold')).grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 12))
-        fields = [('url', 'URL VOD YouTube'), ('start', 'Start'), ('end', 'End'), ('zone', 'Timezone IANA'), ('offset', 'Offset (in seconds)'), ('accounts', 'Account EUW (separati da ;)'), ('riot', 'Riot Personal API Key'), ('twitch', 'Twitch VOD URL'), ('twitch_offset', 'Twitch offset (in seconds)')]
-        for index, (key, label) in enumerate(fields, 1):
+        for row_index, label, left_key, right_key in [
+                (1, 'URL VOD', 'url', 'twitch'),
+                (2, 'Offset (in seconds)', 'offset', 'twitch_offset')]:
+            ttk.Label(frame, text=label).grid(row=row_index, column=0, sticky='w', padx=(0, 12), pady=3)
+            pair = ttk.Frame(frame)
+            pair.grid(row=row_index, column=1, sticky='ew', pady=3)
+            pair.columnconfigure(1, weight=1, uniform='pair')
+            pair.columnconfigure(3, weight=1, uniform='pair')
+            ttk.Label(pair, text='YouTube').grid(row=0, column=0, padx=(0, 8))
+            ttk.Entry(pair, textvariable=self.values[left_key], width=12).grid(row=0, column=1, sticky='ew')
+            ttk.Label(pair, text='Twitch').grid(row=0, column=2, padx=(16, 8))
+            ttk.Entry(pair, textvariable=self.values[right_key], width=12).grid(row=0, column=3, sticky='ew')
+        youtube_test = ttk.Button(frame, text='Test YouTube', command=lambda: self.test_api('YouTube'))
+        youtube_test.grid(row=1, column=2, padx=(8, 0))
+        self.test_buttons.append(youtube_test)
+        fields = [('start', 'Start'), ('end', 'End'), ('zone', 'Timezone IANA'), ('accounts', 'Account EUW (separati da ;)'), ('riot', 'Riot Personal API Key')]
+        for index, (key, label) in enumerate(fields, 3):
             ttk.Label(frame, text=label).grid(row=index, column=0, sticky='w', padx=(0, 12), pady=3)
             widget = ttk.Entry(frame, textvariable=self.values[key], show='•' if key == 'riot' else '', state='readonly' if key in ('start', 'end', 'riot') else 'normal')
             widget.grid(row=index, column=1, sticky='ew', pady=3)
-            if key in ('riot', 'url'):
-                provider = 'Riot' if key == 'riot' else 'YouTube'
-                button = ttk.Button(frame, text='Test ' + provider, command=lambda p=provider: self.test_api(p))
+            if key == 'riot':
+                button = ttk.Button(frame, text='Test Riot', command=lambda: self.test_api('Riot'))
                 button.grid(row=index, column=2, padx=(8, 0))
                 self.test_buttons.append(button)
         ttk.Label(frame, text='Start / End: GG-MM-AAAA HH:MM:SS. Test YouTube legge gli orari. Nessuna preferenza salvata.').grid(row=10, column=0, columnspan=2, sticky='w', pady=8)
@@ -62,7 +80,7 @@ class App:
         self.tree = ttk.Treeview(table, columns=('use', 'time', 'account', 'title', 'download'), show='headings', selectmode='extended')
         for key, title, width in [('use', 'Inclusa', 55), ('time', 'Timestamp', 90), ('account', 'Account', 140), ('title', 'Titolo', 240), ('download', 'Download', 150)]:
             self.tree.heading(key, text=title)
-            self.tree.column(key, width=width, minwidth=45)
+            self.tree.column(key, width=width, minwidth=100 if key == 'download' else 45)
         scroll = ttk.Scrollbar(table, orient='vertical', command=self.tree.yview)
         self.tree.configure(yscrollcommand=scroll.set)
         self.tree.pack(side='left', fill='both', expand=True)
@@ -86,7 +104,7 @@ class App:
                 self.download_buttons.pop(item).destroy()
         for item in self.tree.get_children():
             if item not in self.download_buttons:
-                self.download_buttons[item] = ttk.Button(self.tree, text='Download', command=lambda i=item: self.download_row(i))
+                self.download_buttons[item] = ttk.Button(self.tree, text='Download', style='Download.TButton', command=lambda i=item: self.download_row(i))
             button = self.download_buttons[item]
             box = self.tree.bbox(item, 'download')
             button.configure(state='normal' if enabled else 'disabled')
