@@ -19,7 +19,7 @@ def parse_live_page(page):
                 return start, end
         except (ValueError, KeyError, TypeError):
             continue
-    raise ValueError('Metadati pubblici di inizio/fine live non disponibili. Inserisci una YouTube API key oppure scegli Manuale. Non viene usata la data di pubblicazione.')
+    raise ValueError('Metadati pubblici di inizio/fine live non disponibili. Verifica che il VOD sia una live pubblica conclusa e riprova. Non viene usata la data di pubblicazione.')
 
 
 def public_range(video, opener=urlopen):
@@ -29,7 +29,7 @@ def public_range(video, opener=urlopen):
         with opener(request, timeout=25) as response:
             page = response.read(8 * 1024 * 1024 + 1)
         if len(page) > 8 * 1024 * 1024:
-            raise ValueError('Pagina YouTube troppo grande. Usa API key o Manuale.')
+            raise ValueError('Pagina YouTube troppo grande. Riprova più tardi.')
         return parse_live_page(page.decode('utf-8', errors='replace'))
     except (URLError, OSError, TimeoutError):
-        raise ValueError('Pagina pubblica YouTube non accessibile. Usa API key o Manuale.') from None
+        raise ValueError('Pagina pubblica YouTube non accessibile. Riprova più tardi.') from None

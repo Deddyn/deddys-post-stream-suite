@@ -6,3 +6,4 @@ secrets*
 build/
 dist/
 *.spec
+Riot API.txt

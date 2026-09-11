@@ -1,55 +1,38 @@
 # LoL VOD Timestamps — Windows
 
-App desktop Python/Tkinter per generare timestamp delle partite League of Legends. Account EUW preconfigurati: Deddy#616, Toni Bonji#PALLE, Bubbals#EUW. Interfaccia in italiano.
-
 ## Avvio
 
-1. Serve Python 3.11 o successivo con Tcl/Tk. Se non presente, installalo da https://www.python.org/downloads/windows/ selezionando Tcl/Tk e Python Launcher. Nessuna installazione viene eseguita dall'app.
-2. Per i fusi IANA su Windows può servire `py -m pip install tzdata`. In alternativa inserisci un offset esplicito nella data manuale: `2026-09-11 18:00:00+02:00`. L'offset esplicito prevale sul campo timezone.
-3. Apri `start.cmd`, oppure esegui `py -m vodstamp` dalla cartella del progetto. Il launcher cerca anche il Python incluso in Codex, se disponibile: su questa macchina è stato usato per i test e non è servita un'installazione. Per uso indipendente da Codex è consigliata un'installazione Python standard.
-4. Incolla Riot Personal API Key nel campo mascherato. La chiave resta solo nella memoria del processo. Puoi anche fornire `RIOT_API_KEY` nell'ambiente del processo, senza inserirla in file del repository.
-5. La chiave YouTube è facoltativa: se lasci il campo vuoto, l'app cerca inizio e fine nei metadati pubblici della pagina del VOD, senza scaricare il video. Questa lettura non ufficiale può fallire per consenso, login, blocchi o modifiche YouTube. In quel caso usa Manuale oppure abilita YouTube Data API v3 nel tuo progetto Google Cloud e inserisci una API key limitata a tale API nel campo dedicato (o nell'ambiente `YOUTUBE_API_KEY`).
-6. Inserisci URL YouTube di una live conclusa, oppure scegli Manuale e indica inizio e durata (12 ore predefinite).
-7. Genera, controlla le righe, includi/escludi con Spazio o i pulsanti. Doppio clic modifica il titolo; doppio clic nella prima colonna cambia l'inclusione. Copia negli appunti.
+Apri start.cmd. Serve Python 3.11+ con Tkinter e tzdata; il launcher supporta anche il runtime incluso in Codex.
 
-Non incollare le chiavi in chat, sorgenti o comandi salvati nella cronologia. Le preferenze non sensibili vengono salvate quando premi Genera, in `%LOCALAPPDATA%\VodTimestamps\settings.json`, fuori dal repository. Nessuna chiave viene salvata né scritta nei log. Le chiavi vengono inviate esclusivamente via HTTPS ai rispettivi provider. Se vuoi conservarle tra sessioni, gestiscile esternamente; l'app non include un archivio persistente dei segreti.
+Metti soltanto la chiave Riot nel file `Riot API.txt` accanto a start.cmd, salvato in UTF-8. L’app legge il file all’avvio e prima di ogni generazione o test Riot. Il campo è mascherato e non modificabile: per cambiare chiave modifica il file. Il file è escluso da Git, ma resta un file locale in chiaro: non includerlo quando condividi la cartella.
 
-## Comportamento
+1. Inserisci il link YouTube del VOD pubblico di una live conclusa.
+2. Premi Test YouTube per compilare Start ed End, oppure direttamente Genera timestamp.
+3. Controlla le righe e modifica i titoli con doppio clic. Spazio include/esclude le righe.
+4. Premi Copia.
 
-### Diagnostica
+Start ed End sono automatici e non modificabili, in formato GG-MM-AAAA HH:MM:SS, nella timezone indicata (Europe/Rome predefinita). Offset (in seconds) sposta i timestamp: positivo avanti, negativo indietro. La chiave YouTube e la durata manuale non sono richieste.
 
-I pulsanti **Test Riot** e **Test YouTube**, accanto alle chiavi, eseguono richieste reali usando i valori attualmente inseriti. Non salvano le chiavi e non modificano la tabella dei risultati.
+Nessuna preferenza viene caricata o salvata. URL, Start, End e risultati ripartono vuoti; offset, timezone e i tre account EUW ripartono dai valori predefiniti. Gli eventuali vecchi settings.json non vengono più utilizzati.
 
-Test Riot controlla Account-v1, cronologia Match-v5 e, se disponibile, il dettaglio di una partita recente per ogni account. Si ferma al primo errore e indica il passaggio preciso. Non usa la data del VOD: una cronologia vuota non implica una chiave errata. Test YouTube controlla l'accesso ai metadati live del VOD inserito. Il rapporto si può copiare senza includere chiavi o risposte grezze.
+## Diagnostica e limiti
 
-- Con chiave, YouTube usa `liveStreamingDetails.actualStartTime` e `actualEndTime`; senza chiave cerca `liveBroadcastDetails.startTimestamp` e `endTimestamp` nella pagina pubblica. Richiede entrambi gli orari, con timezone e fine successiva all'inizio. Non usa data di pubblicazione né orari pianificati. Se i dati mancano mostra un errore; non inventa un intervallo. Anche Test YouTube funziona senza chiave.
-- Account-v1 e Match-v5 usano il routing EUROPE, corretto per gli account EUW. Non viene applicato alcun filtro queue. Gli ID sono paginati, deduplicati fra gli account e poi ordinati per inizio partita.
-- Include partite con inizio nell'intervallo `[inizio, fine)`. Una partita iniziata prima della live è esclusa, anche se termina durante la live. Una partita iniziata nella live è inclusa anche se termina dopo. Sono disponibili soltanto i match restituiti da Riot: VOD molto vecchi possono non avere una cronologia recuperabile.
-- Timestamp basato su `gameStartTimestamp`, non sull'inizio della champion select. Correzione in secondi: positiva sposta i timestamp avanti, negativa indietro. Valori negativi finali vengono limitati a zero e segnalati.
-- Su Summoner's Rift CLASSIC cerca un unico avversario con `teamPosition` corrispondente. È una stima Riot, non una verifica del lane swap reale. In caso incerto usa `Champion vs ?` e chiede revisione. ARAM e altre modalità usano `Champion - gameMode`.
-- Se più account configurati sono nello stesso match, viene creata una sola riga e ha priorità il primo account configurato presente. Una nota segnala di verificare la prospettiva.
-- Conversioni UTC con timezone IANA. Ore ambigue o inesistenti durante il cambio ora vengono rifiutate: inserisci un offset esplicito.
-- Richieste in background, timeout 25 secondi, massimo quattro tentativi per rate limit ed errori server. Attese Retry-After superiori a 120 secondi richiedono un nuovo tentativo manuale. Un errore interrompe la generazione senza mostrare un elenco parziale come completo.
-- Live ritagliate, pause o differenze tra stream e VOD possono richiedere correzioni. Un offset costante non risolve tagli multipli. Verifica il primo timestamp sul video.
-- Il testo copiato è una lista timestamp. Per attivare i capitoli YouTube valgono ulteriori requisiti della piattaforma; l'app non aggiunge un capitolo iniziale artificiale.
+Test Riot verifica Account-v1, cronologia e dettaglio Match-v5 per gli account preconfigurati Deddy#616, Toni Bonji#PALLE e Bubbals#EUW. I rapporti non contengono chiavi. I test non salvano risultati o preferenze.
 
-## Test e struttura
+YouTube viene letto tramite i metadati pubblici liveBroadcastDetails della pagina, senza scaricare video né eseguire script. Servono startTimestamp ed endTimestamp validi. Consenso, login, blocchi o modifiche della pagina possono impedire la lettura: l’app segnala il problema senza inventare orari. Non viene usata la data di pubblicazione.
 
-Esegui `py -m unittest discover -s tests -v`. Test offline con risposte simulate: nessuna chiave richiesta, nessuna chiamata esterna.
+Tutte le queue sono incluse. Gli ID vengono paginati, deduplicati e ordinati. Sono incluse le partite iniziate nell’intervallo [Start, End), usando gameStartTimestamp. Match precedenti alla live sono esclusi. Riot potrebbe non restituire cronologie molto vecchie.
 
-- `vodstamp/core.py`: date, intervalli, matchup e formattazione.
-- `vodstamp/api.py`: HTTP, YouTube e Riot.
-- `vodstamp/settings.py`: preferenze senza segreti.
-- `vodstamp/gui.py`: GUI e worker.
-- `tests/`: regressioni logiche, API simulate e smoke test GUI.
+Su Summoner’s Rift CLASSIC il matchup usa teamPosition: è una stima Riot e può non riflettere lane swap. In caso incerto compare Champion vs ?. Altre modalità usano Champion - modalità. Più account nello stesso match producono una sola riga, con priorità al primo account configurato presente e una nota di verifica.
 
-Per verificare le API reali, configura localmente entrambe le chiavi e usa un VOD recente con una partita nota. Confronta orario e matchup con il VOD. Questa verifica richiede credenziali dell'utente e non è inclusa nei test offline.
+VOD ritagliati possono richiedere un offset; tagli multipli non si correggono con un unico offset. Il formato copiato è una lista timestamp, senza capitolo iniziale artificiale.
 
-## Fonti
+## Test
 
-- https://developer.riotgames.com/apis/ — Account-v1 e Match-v5.
-- https://github.com/RiotGames/developer-relations/issues/554 — limiti di teamPosition.
-- https://developers.google.com/youtube/v3/docs/videos — metadati live.
-- https://developers.google.com/youtube/v3/docs/videos/list — endpoint videos.list.
+Dalla cartella: `py -3 -m unittest discover -s tests -v`. Test offline con credenziali fittizie. I test GUI richiedono Tkinter. Le API reali si verificano con i pulsanti dell’app.
 
-Progetto personale non affiliato né approvato da Riot Games o YouTube.
+Moduli: core.py (match e date), api.py (API), youtube_public.py (pagina pubblica), credentials.py (file chiave), diagnostics.py (test API), gui.py (interfaccia). settings.py rimane solo per compatibilità con i test precedenti, non è usato dall’app.
+
+Fonti: https://developer.riotgames.com/apis/ e https://github.com/yt-dlp/yt-dlp/issues/489
+
+Progetto personale non affiliato a Riot Games o YouTube.

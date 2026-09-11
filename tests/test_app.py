@@ -124,18 +124,23 @@ class GuiTests(unittest.TestCase):
         root = tk.Tk()
         root.withdraw()
         try:
-            with patch('vodstamp.gui.settings.load', return_value={}): app = App(root)
-            app.values['source'].set('Manuale')
-            app.values['start'].set('2026-09-11 12:00:00+00:00')
+            with patch('vodstamp.gui.load_riot_key', return_value='fake-key'): app = App(root)
+            app.values['url'].set('https://youtu.be/abcdefghijk')
             app.values['riot'].set('fake-key')
             expected = [Row('1', 'Deddy#616', 60, 'Jax vs Garen')]
-            with patch('vodstamp.gui.settings.save'), patch('vodstamp.gui.Riot.collect', return_value=expected):
+            with patch('vodstamp.gui.load_riot_key', return_value='fake-key'), patch('vodstamp.gui.youtube_range', return_value=(START, START + timedelta(hours=4))), patch('vodstamp.gui.Riot.collect', return_value=expected):
                 app.run()
                 deadline = time.monotonic() + 3
                 while not app.rows and time.monotonic() < deadline:
                     root.update()
                     time.sleep(0.01)
             self.assertEqual(app.rows, expected)
+            self.assertEqual(app.values['start'].get(), '11-09-2026 14:00:00')
+            self.assertEqual(app.values['end'].get(), '11-09-2026 18:00:00')
+            app.values['url'].set('')
+            self.assertEqual(app.values['start'].get(), '')
+            self.assertNotIn('hours', app.values)
+            self.assertNotIn('youtube', app.values)
             self.assertEqual(app.preview.get('1.0', 'end').strip(), '00:01:00 - Jax vs Garen')
         finally:
             for timer in root.tk.call('after', 'info'):
@@ -148,7 +153,7 @@ class GuiTests(unittest.TestCase):
         root = tk.Tk()
         root.withdraw()
         try:
-            with patch('vodstamp.gui.settings.load', return_value={}): app = App(root)
+            with patch('vodstamp.gui.load_riot_key', return_value='fake-key'): app = App(root)
             app.rows = [Row('1','a',61,'Jax vs Garen'), Row('2','a',121,'Ahri - ARAM')]
             app.refresh()
             root.update()

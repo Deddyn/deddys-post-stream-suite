@@ -1,12 +1,11 @@
-import os
 import queue
 import threading
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
-from datetime import datetime
-from .core import ACCOUNTS, manual_range, output, stamp
+from zoneinfo import ZoneInfo
+from .core import ACCOUNTS, output, stamp
 from .api import Http, Riot, youtube_range, ApiError
-from . import settings
+from .credentials import load_riot_key
 from .diagnostics import diagnose
 
 class App:
@@ -21,26 +20,27 @@ class App:
         frame = ttk.Frame(root, padding=18)
         frame.pack(fill='both', expand=True)
         frame.columnconfigure(1, weight=1)
-        defaults = dict(source='YouTube', url='', start=datetime.now().strftime('%Y-%m-%d %H:%M:%S'), hours='12', zone='Europe/Rome', offset='0', accounts='; '.join(ACCOUNTS))
-        defaults.update(settings.load())
-        if defaults['source'] not in ('YouTube', 'Manuale'):
-            defaults['source'] = 'YouTube'
+        defaults = dict(url='', start='', end='', zone='Europe/Rome', offset='0', accounts='; '.join(ACCOUNTS))
         self.values = {k: tk.StringVar(value=v) for k, v in defaults.items()}
-        self.values['riot'] = tk.StringVar(value=os.environ.get('RIOT_API_KEY', ''))
-        self.values['youtube'] = tk.StringVar(value=os.environ.get('YOUTUBE_API_KEY', ''))
+        try:
+            initial_key = load_riot_key()
+            key_status = 'Chiave Riot caricata dal file. Inserisci il link del VOD.'
+        except ValueError as error:
+            initial_key, key_status = '', str(error)
+        self.values['riot'] = tk.StringVar(value=initial_key)
         self.test_buttons = []
         ttk.Label(frame, text='Timestamp delle tue partite', font=('Segoe UI', 19, 'bold')).grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 12))
-        fields = [('source', 'Sorgente'), ('url', 'URL VOD YouTube'), ('start', 'Inizio manuale (AAAA-MM-GG HH:MM:SS)'), ('hours', 'Durata manuale (ore)'), ('zone', 'Timezone IANA'), ('offset', 'Correzione timestamp (secondi, anche negativa)'), ('accounts', 'Account EUW (separati da ;)'), ('riot', 'Riot Personal API Key'), ('youtube', 'YouTube Data API key')]
+        fields = [('url', 'URL VOD YouTube'), ('start', 'Start'), ('end', 'End'), ('zone', 'Timezone IANA'), ('offset', 'Offset (in seconds)'), ('accounts', 'Account EUW (separati da ;)'), ('riot', 'Riot Personal API Key')]
         for index, (key, label) in enumerate(fields, 1):
             ttk.Label(frame, text=label).grid(row=index, column=0, sticky='w', padx=(0, 12), pady=3)
-            widget = ttk.Combobox(frame, textvariable=self.values[key], values=['YouTube', 'Manuale'], state='readonly') if key == 'source' else ttk.Entry(frame, textvariable=self.values[key], show='•' if key in ('riot', 'youtube') else '')
+            widget = ttk.Entry(frame, textvariable=self.values[key], show='•' if key == 'riot' else '', state='readonly' if key in ('start', 'end', 'riot') else 'normal')
             widget.grid(row=index, column=1, sticky='ew', pady=3)
-            if key in ('riot', 'youtube'):
+            if key in ('riot', 'url'):
                 provider = 'Riot' if key == 'riot' else 'YouTube'
                 button = ttk.Button(frame, text='Test ' + provider, command=lambda p=provider: self.test_api(p))
                 button.grid(row=index, column=2, padx=(8, 0))
                 self.test_buttons.append(button)
-        ttk.Label(frame, text='YouTube key facoltativa: se vuota, legge la pagina pubblica. Doppio clic: modifica titolo. Spazio: includi/escludi.').grid(row=10, column=0, columnspan=2, sticky='w', pady=8)
+        ttk.Label(frame, text='Start / End: GG-MM-AAAA HH:MM:SS. Test YouTube legge gli orari. Nessuna preferenza salvata.').grid(row=10, column=0, columnspan=2, sticky='w', pady=8)
         actions = ttk.Frame(frame)
         actions.grid(row=11, column=0, columnspan=2, sticky='ew')
         self.generate = ttk.Button(actions, text='Genera timestamp', command=self.run)
@@ -49,7 +49,7 @@ class App:
         ttk.Button(actions, text='Seleziona tutti', command=lambda: self.select_all(True)).pack(side='left')
         ttk.Button(actions, text='Escludi tutti', command=lambda: self.select_all(False)).pack(side='left', padx=8)
         ttk.Button(actions, text='Copia', command=self.copy).pack(side='right')
-        self.status = tk.StringVar(value='Pronto. Inserisci le chiavi e scegli un VOD oppure Manuale.')
+        self.status = tk.StringVar(value=key_status)
         ttk.Label(frame, textvariable=self.status, wraplength=1000).grid(row=12, column=0, columnspan=2, sticky='w', pady=8)
         table = ttk.Frame(frame)
         table.grid(row=13, column=0, columnspan=2, sticky='nsew')
@@ -66,6 +66,7 @@ class App:
         self.tree.bind('<Double-1>', self.edit)
         self.preview = tk.Text(frame, height=6, wrap='word')
         self.preview.grid(row=14, column=0, columnspan=2, sticky='ew', pady=(10, 0))
+        self.values['url'].trace_add('write', self.clear_dates)
         root.after(100, self.poll)
 
     def refresh(self):
@@ -116,13 +117,38 @@ class App:
         for button in [self.generate] + self.test_buttons:
             button.configure(state='disabled' if value else 'normal')
 
+    def clear_dates(self, *_):
+        self.values['start'].set('')
+        self.values['end'].set('')
+
+    def display_bounds(self, start, end, zone):
+        self.values['start'].set(start.astimezone(zone).strftime('%d-%m-%Y %H:%M:%S'))
+        self.values['end'].set(end.astimezone(zone).strftime('%d-%m-%Y %H:%M:%S'))
+
     def test_api(self, provider):
-        key = self.values['riot' if provider == 'Riot' else 'youtube'].get()
         accounts, url = self.values['accounts'].get(), self.values['url'].get()
+        try:
+            key = load_riot_key() if provider == 'Riot' else ''
+            if provider == 'Riot':
+                self.values['riot'].set(key)
+            zone = ZoneInfo(self.values['zone'].get())
+        except (ValueError, KeyError):
+            messagebox.showerror('Configurazione', 'Controlla Riot API.txt e la timezone IANA.')
+            return
         self.busy(True)
         self.status.set('Test ' + provider + ' in corso…')
         def worker():
-            self.events.put(('diagnostic', diagnose(provider, key, accounts, url)))
+            if provider == 'YouTube':
+                try:
+                    start, end = youtube_range(Http(), url, '')
+                    self.events.put(('bounds', (start, end, zone)))
+                    self.events.put(('diagnostic', 'OK — Inizio e fine stream letti dalla pagina YouTube.'))
+                except (ApiError, ValueError) as error:
+                    self.events.put(('error', str(error)))
+                except Exception:
+                    self.events.put(('error', 'Lettura YouTube fallita. Riprova.'))
+            else:
+                self.events.put(('diagnostic', diagnose(provider, key, accounts, url)))
         threading.Thread(target=worker, daemon=True).start()
 
     def show_diagnostic(self, report):
@@ -145,9 +171,10 @@ class App:
             if not accounts or any('#' not in a or not all(a.rsplit('#', 1)) for a in accounts):
                 raise ValueError('Account richiesti nel formato Nome#TAG, separati da ;')
             offset = int(values['offset'])
-            bounds = manual_range(values['start'], values['zone'], values['hours']) if values['source'] == 'Manuale' else None
-            settings.save(values)
-        except (ValueError, OSError) as error:
+            zone = ZoneInfo(values['zone'])
+            values['riot'] = load_riot_key()
+            self.values['riot'].set(values['riot'])
+        except (ValueError, OSError, KeyError) as error:
             messagebox.showerror('Configurazione', str(error))
             return
         self.rows = []
@@ -158,7 +185,8 @@ class App:
         def worker():
             try:
                 http = Http()
-                start, end = bounds or youtube_range(http, values['url'], values['youtube'])
+                start, end = youtube_range(http, values['url'], '')
+                self.events.put(('bounds', (start, end, zone)))
                 rows = Riot(http, values['riot']).collect(accounts, start, end, offset, lambda msg: self.events.put(('status', msg)))
                 self.events.put(('done', (rows, start, end)))
             except (ApiError, ValueError) as error:
@@ -171,7 +199,9 @@ class App:
         try:
             while True:
                 kind, value = self.events.get_nowait()
-                if kind == 'status':
+                if kind == 'bounds':
+                    self.display_bounds(*value)
+                elif kind == 'status':
                     self.status.set(value)
                 else:
                     self.busy(False)
@@ -184,7 +214,7 @@ class App:
                     else:
                         self.rows, start, end = value
                         self.refresh()
-                        self.status.set(f'{len(self.rows)} partite · {start.isoformat()} — {end.isoformat()} · verifica matchup e correzione VOD.')
+                        self.status.set(f'{len(self.rows)} partite · {self.values['start'].get()} — {self.values['end'].get()} · verifica matchup e correzione VOD.')
         except queue.Empty:
             pass
         self.root.after(100, self.poll)
