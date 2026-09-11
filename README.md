@@ -17,6 +17,14 @@ Nessuna preferenza viene caricata o salvata. URL, Start, End e risultati riparto
 
 ## Diagnostica e limiti
 
+### Download YouTube
+
+La colonna Download contiene due pulsanti: Youtube e Twitch, abilitati separatamente in base al link e all’offset della piattaforma. Entrambi propongono la durata Riot con 10 secondi prima e 20 dopo, modificabili prima del salvataggio. Un solo download alla volta.
+
+Youtube usa il file `yt-dlp` fornito accanto a start.cmd, avviato con lo stesso Python dell’app, e FFmpeg già disponibile. Non richiede pip. Se presente, usa Deno in `%USERPROFILE%/.deno/bin/deno.exe`. Il ritaglio usa download-sections e force-keyframes-at-cuts: la ricodifica può richiedere tempo. Output MP4, nessuna sovrascrittura, configurazioni esterne yt-dlp ignorate. Il nome proposto include la piattaforma.
+
+L’offset YouTube viene applicato all’inizio grezzo della partita, indipendentemente dall’offset Twitch. La lettura dei metadati e il download sono operazioni distinte: un VOD leggibile può comunque non essere scaricabile. Blocchi YouTube, login o dipendenze richieste da nuove versioni vengono riportati nel messaggio di errore. Non vengono letti automaticamente cookie del browser. Documentazione: https://github.com/yt-dlp/yt-dlp#usage-and-options
+
 ### Download Twitch
 
 Inserisci Twitch VOD URL e Twitch offset (in seconds). La colonna Download sostituisce Verifica, con un pulsante per partita attivo solo con URL Twitch valido e offset intero. Non è necessario includere la partita nei timestamp per scaricarla.

@@ -7,6 +7,16 @@ from test_app import match, START
 from datetime import timedelta
 
 class DownloadTests(unittest.TestCase):
+    def test_youtube_command(self):
+        from vodstamp.downloader import youtube_command
+        with patch.object(Path, 'is_file', return_value=True):
+            args = youtube_command('https://youtu.be/abcdefghijk?t=10', 60, 180, 'C:/video 100%.mp4')
+        self.assertEqual(args[args.index('--download-sections')+1], '*60-180')
+        self.assertEqual(args[args.index('--output')+1], 'C:/video 100%%.mp4')
+        self.assertEqual(args[-1], 'https://www.youtube.com/watch?v=abcdefghijk')
+        self.assertIn('--ignore-config', args)
+        self.assertIn('--no-overwrites', args)
+
     def test_url(self):
         self.assertEqual(twitch_id('https://www.twitch.tv/videos/12345?t=2h'), '12345')
         for url in ['https://twitch.tv.evil/videos/12345', 'https://twitch.tv/videos/no', 'file:///videos/123', 'https://twitch.tv/name']:
@@ -46,13 +56,18 @@ class DownloadTests(unittest.TestCase):
             app.rows = [Row('1', 'a', 10, 'Jax', raw_seconds=10, duration=100)]
             app.refresh()
             app.place_download_buttons()
-            self.assertIn('disabled', app.download_buttons['0'].state())
+            self.assertIn('disabled', app.download_buttons['0']['Twitch'].state())
+            self.assertIn('disabled', app.download_buttons['0']['Youtube'].state())
+            app.values['url'].set('https://youtu.be/abcdefghijk')
+            app.place_download_buttons()
+            self.assertNotIn('disabled', app.download_buttons['0']['Youtube'].state())
+            self.assertIn('disabled', app.download_buttons['0']['Twitch'].state())
             app.values['twitch'].set('https://twitch.tv/videos/123')
             app.place_download_buttons()
-            self.assertNotIn('disabled', app.download_buttons['0'].state())
+            self.assertNotIn('disabled', app.download_buttons['0']['Twitch'].state())
             app.downloading = True
             app.place_download_buttons()
-            self.assertIn('disabled', app.download_buttons['0'].state())
+            self.assertIn('disabled', app.download_buttons['0']['Twitch'].state())
         finally:
             for timer in root.tk.call('after', 'info'): root.after_cancel(timer)
             root.destroy()

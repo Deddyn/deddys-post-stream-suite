@@ -3,7 +3,7 @@ import threading
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog, filedialog
 from zoneinfo import ZoneInfo
-from .core import ACCOUNTS, output, stamp
+from .core import ACCOUNTS, output, stamp, video_id
 from .api import Http, Riot, youtube_range, ApiError
 from .credentials import load_riot_key
 from .diagnostics import diagnose
@@ -78,9 +78,9 @@ class App:
         table.grid(row=13, column=0, columnspan=2, sticky='nsew')
         frame.rowconfigure(13, weight=1)
         self.tree = ttk.Treeview(table, columns=('use', 'time', 'account', 'title', 'download'), show='headings', selectmode='extended')
-        for key, title, width in [('use', 'Inclusa', 55), ('time', 'Timestamp', 90), ('account', 'Account', 140), ('title', 'Titolo', 240), ('download', 'Download', 150)]:
+        for key, title, width in [('use', 'Inclusa', 55), ('time', 'Timestamp', 90), ('account', 'Account', 140), ('title', 'Titolo', 240), ('download', 'Download', 180)]:
             self.tree.heading(key, text=title)
-            self.tree.column(key, width=width, minwidth=100 if key == 'download' else 45)
+            self.tree.column(key, width=width, minwidth=170 if key == 'download' else 45)
         scroll = ttk.Scrollbar(table, orient='vertical', command=self.tree.yview)
         self.tree.configure(yscrollcommand=scroll.set)
         self.tree.pack(side='left', fill='both', expand=True)
@@ -93,44 +93,49 @@ class App:
         root.after(100, self.poll)
 
     def place_download_buttons(self):
-        try:
-            downloader.twitch_id(self.values['twitch'].get())
-            int(self.values['twitch_offset'].get())
-            enabled = not self.downloading
-        except ValueError:
-            enabled = False
+        enabled = {}
+        for platform, key, offset_key, validator in [('Twitch', 'twitch', 'twitch_offset', downloader.twitch_id), ('Youtube', 'url', 'offset', video_id)]:
+            try:
+                validator(self.values[key].get())
+                int(self.values[offset_key].get())
+                enabled[platform] = not self.downloading
+            except ValueError:
+                enabled[platform] = False
         for item in list(self.download_buttons):
             if not self.tree.exists(item):
-                self.download_buttons.pop(item).destroy()
+                for button in self.download_buttons.pop(item).values():
+                    button.destroy()
         for item in self.tree.get_children():
             if item not in self.download_buttons:
-                self.download_buttons[item] = ttk.Button(self.tree, text='Download', style='Download.TButton', command=lambda i=item: self.download_row(i))
-            button = self.download_buttons[item]
+                self.download_buttons[item] = {p: ttk.Button(self.tree, text=p, style='Download.TButton', command=lambda i=item, platform=p: self.download_row(i, platform)) for p in ('Youtube', 'Twitch')}
             box = self.tree.bbox(item, 'download')
-            button.configure(state='normal' if enabled else 'disabled')
-            if box:
-                x, y, width, height = box
-                button.place(x=x+3, y=y+2, width=max(40, width-6), height=height-4)
-            else:
-                button.place_forget()
+            for index, (platform, button) in enumerate(self.download_buttons[item].items()):
+                button.configure(state='normal' if enabled[platform] else 'disabled')
+                if box:
+                    x, y, width, height = box
+                    half = (width-9)//2
+                    button.place(x=x+3+index*(half+3), y=y+2, width=half, height=height-4)
+                else:
+                    button.place_forget()
 
-    def download_row(self, item):
+    def download_row(self, item, platform='Twitch'):
         if self.downloading or not self.tree.exists(item):
             return
         row = self.rows[int(item)]
-        url = self.values['twitch'].get().strip()
+        youtube = platform == 'Youtube'
+        url = self.values['url' if youtube else 'twitch'].get().strip()
         try:
-            downloader.twitch_id(url)
-            start, end = downloader.trim(row, self.values['twitch_offset'].get())
+            (video_id if youtube else downloader.twitch_id)(url)
+            start, end = downloader.trim(row, self.values['offset' if youtube else 'twitch_offset'].get())
         except ValueError as error:
             messagebox.showerror('Download', str(error))
             return
         window = tk.Toplevel(self.root)
-        window.title('Download partita')
+        window.title('Download ' + platform)
         window.transient(self.root)
         window.grab_set()
         ttk.Label(window, text=row.title, padding=12).pack()
-        ttk.Label(window, text='Secondi nel VOD Twitch. Inclusi 10 s prima e 20 s dopo.').pack(padx=12)
+        ttk.Label(window, text=f'Secondi nel VOD {platform}. Inclusi 10 s prima e 20 s dopo.').pack(padx=12)
         begin, finish = tk.StringVar(value=str(start)), tk.StringVar(value=str(end))
         for label, variable in [('Start (seconds)', begin), ('End (seconds)', finish)]:
             ttk.Label(window, text=label).pack(pady=(8, 0))
@@ -141,22 +146,22 @@ class App:
                 a, b = int(begin.get()), int(finish.get())
                 if a < 0 or b <= a:
                     raise ValueError('Start deve essere >= 0 ed End maggiore di Start.')
-                filename = re.sub(r'[<>:"/\\|?*]', '_', row.title)[:100] + '_' + row.match_id + '.mp4'
+                filename = re.sub(r'[<>:"/\\|?*]', '_', row.title)[:100] + '_' + row.match_id + '_' + platform + '.mp4'
                 target = filedialog.asksaveasfilename(parent=window, defaultextension='.mp4', filetypes=[('Video MP4', '*.mp4')], initialfile=filename)
                 if not target:
                     return
                 if Path(target).exists():
                     raise ValueError('Scegli un nome nuovo: i file esistenti non vengono sovrascritti.')
-                args = downloader.command(url, a, b, target)
+                args = (downloader.youtube_command if youtube else downloader.command)(url, a, b, target)
             except ValueError as error:
                 messagebox.showerror('Download', str(error), parent=window)
                 return
             window.destroy()
             self.downloading = True
-            self.status.set('Download Twitch in corso…')
+            self.status.set('Download ' + platform + ' in corso…')
             def worker():
                 try:
-                    downloader.download(args, lambda text: self.events.put(('download_status', text)))
+                    downloader.download(args, lambda text: self.events.put(('download_status', text)), target)
                     self.events.put(('download_done', target))
                 except (ValueError, OSError) as error:
                     self.events.put(('download_error', str(error)))
