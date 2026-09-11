@@ -21,7 +21,7 @@ if __name__ == '__main__':
             process = subprocess.run([str(TOOLS / tool)] + args, capture_output=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
             result[tool] = (process.returncode == 0 or
                             (tool.startswith('TwitchDownloaderCLI/') and process.returncode == 1
-                             and b'TwitchDownloaderCLI 1.56.5' in process.stdout))
+                             and b'TwitchDownloaderCLI 1.56.5' in process.stdout + process.stderr))
         (ROOT / 'self-test.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
         root.destroy()
         sys.exit(0 if all(result.values()) else 1)
