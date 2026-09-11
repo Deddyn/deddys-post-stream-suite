@@ -7,6 +7,7 @@ from datetime import datetime
 from .core import ACCOUNTS, manual_range, output, stamp
 from .api import Http, Riot, youtube_range, ApiError
 from . import settings
+from .diagnostics import diagnose
 
 class App:
     def __init__(self, root):
@@ -27,12 +28,18 @@ class App:
         self.values = {k: tk.StringVar(value=v) for k, v in defaults.items()}
         self.values['riot'] = tk.StringVar(value=os.environ.get('RIOT_API_KEY', ''))
         self.values['youtube'] = tk.StringVar(value=os.environ.get('YOUTUBE_API_KEY', ''))
+        self.test_buttons = []
         ttk.Label(frame, text='Timestamp delle tue partite', font=('Segoe UI', 19, 'bold')).grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 12))
         fields = [('source', 'Sorgente'), ('url', 'URL VOD YouTube'), ('start', 'Inizio manuale (AAAA-MM-GG HH:MM:SS)'), ('hours', 'Durata manuale (ore)'), ('zone', 'Timezone IANA'), ('offset', 'Correzione timestamp (secondi, anche negativa)'), ('accounts', 'Account EUW (separati da ;)'), ('riot', 'Riot Personal API Key'), ('youtube', 'YouTube Data API key')]
         for index, (key, label) in enumerate(fields, 1):
             ttk.Label(frame, text=label).grid(row=index, column=0, sticky='w', padx=(0, 12), pady=3)
             widget = ttk.Combobox(frame, textvariable=self.values[key], values=['YouTube', 'Manuale'], state='readonly') if key == 'source' else ttk.Entry(frame, textvariable=self.values[key], show='•' if key in ('riot', 'youtube') else '')
             widget.grid(row=index, column=1, sticky='ew', pady=3)
+            if key in ('riot', 'youtube'):
+                provider = 'Riot' if key == 'riot' else 'YouTube'
+                button = ttk.Button(frame, text='Test ' + provider, command=lambda p=provider: self.test_api(p))
+                button.grid(row=index, column=2, padx=(8, 0))
+                self.test_buttons.append(button)
         ttk.Label(frame, text='Le chiavi non vengono salvate. Doppio clic su una riga: modifica titolo. Spazio: includi/escludi.').grid(row=10, column=0, columnspan=2, sticky='w', pady=8)
         actions = ttk.Frame(frame)
         actions.grid(row=11, column=0, columnspan=2, sticky='ew')
@@ -105,6 +112,32 @@ class App:
         self.root.clipboard_append(text)
         self.status.set('Timestamp copiati negli appunti.')
 
+    def busy(self, value):
+        for button in [self.generate] + self.test_buttons:
+            button.configure(state='disabled' if value else 'normal')
+
+    def test_api(self, provider):
+        key = self.values['riot' if provider == 'Riot' else 'youtube'].get()
+        accounts, url = self.values['accounts'].get(), self.values['url'].get()
+        self.busy(True)
+        self.status.set('Test ' + provider + ' in corso…')
+        def worker():
+            self.events.put(('diagnostic', diagnose(provider, key, accounts, url)))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def show_diagnostic(self, report):
+        window = tk.Toplevel(self.root)
+        window.title('Risultato test API')
+        window.geometry('760x480')
+        text = tk.Text(window, wrap='word', padx=12, pady=12)
+        text.pack(fill='both', expand=True)
+        text.insert('1.0', report)
+        text.configure(state='disabled')
+        def copy_report():
+            self.root.clipboard_clear()
+            self.root.clipboard_append(report)
+        ttk.Button(window, text='Copia rapporto (senza chiavi)', command=copy_report).pack(pady=8)
+
     def run(self):
         values = {k: v.get().strip() for k, v in self.values.items()}
         try:
@@ -120,7 +153,7 @@ class App:
         self.rows = []
         self.tree.delete(*self.tree.get_children())
         self.refresh()
-        self.generate.configure(state='disabled')
+        self.busy(True)
         self.status.set('Recupero partite in corso…')
         def worker():
             try:
@@ -141,8 +174,11 @@ class App:
                 if kind == 'status':
                     self.status.set(value)
                 else:
-                    self.generate.configure(state='normal')
-                    if kind == 'error':
+                    self.busy(False)
+                    if kind == 'diagnostic':
+                        self.status.set('Test terminato. Consulta il rapporto diagnostico.')
+                        self.show_diagnostic(value)
+                    elif kind == 'error':
                         self.status.set(value)
                         messagebox.showerror('Recupero fallito', value)
                     else:

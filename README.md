@@ -16,6 +16,12 @@ Non incollare le chiavi in chat, sorgenti o comandi salvati nella cronologia. Le
 
 ## Comportamento
 
+### Diagnostica
+
+I pulsanti **Test Riot** e **Test YouTube**, accanto alle chiavi, eseguono richieste reali usando i valori attualmente inseriti. Non salvano le chiavi e non modificano la tabella dei risultati.
+
+Test Riot controlla Account-v1, cronologia Match-v5 e, se disponibile, il dettaglio di una partita recente per ogni account. Si ferma al primo errore e indica il passaggio preciso. Non usa la data del VOD: una cronologia vuota non implica una chiave errata. Test YouTube controlla l'accesso ai metadati live del VOD inserito. Il rapporto si può copiare senza includere chiavi o risposte grezze.
+
 - YouTube usa `liveStreamingDetails.actualStartTime` e `actualEndTime`. Se mancano, mostra un errore e invita a scegliere Manuale; non inventa un intervallo.
 - Account-v1 e Match-v5 usano il routing EUROPE, corretto per gli account EUW. Non viene applicato alcun filtro queue. Gli ID sono paginati, deduplicati fra gli account e poi ordinati per inizio partita.
 - Include partite con inizio nell'intervallo `[inizio, fine)`. Una partita iniziata prima della live è esclusa, anche se termina durante la live. Una partita iniziata nella live è inclusa anche se termina dopo. Sono disponibili soltanto i match restituiti da Riot: VOD molto vecchi possono non avere una cronologia recuperabile.
