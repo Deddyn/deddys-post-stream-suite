@@ -10,7 +10,8 @@ Want to save a great game? Download it directly from YouTube, or add the matchin
 
 **[Download for Windows](https://github.com/Deddyn/deddys-post-stream-suite/releases/latest)**
 
-<img width="937" height="835" alt="Deddy’s Post Stream Suite interface showing VOD inputs, match timestamps and download buttons" src="https://github.com/user-attachments/assets/7e3d2fd5-fd07-4555-b54b-365c7e0470a5" />
+<img width="1171" height="841" alt="Screenshot 2026-09-13 011545" src="https://github.com/user-attachments/assets/0b400874-5973-4f1d-954a-113c441bd964" />
+
 
 ## Quick start — Windows 10/11, 64-bit
 
