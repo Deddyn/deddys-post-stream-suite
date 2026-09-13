@@ -1,6 +1,6 @@
 # Deddy’s Post Stream Suite
 
-Turn your League of Legends streams into ready-to-copy timestamps and individual match videos.
+Turn your League of Legends streams individual match videos (and also generate Timestamps for your Youtube VODs descriptions).
 
 Paste your YouTube livestream VOD link, enter your EUW accounts, and generate a chronological list of your games. The app matches your Riot match history with the stream’s start and end times automatically.
 
