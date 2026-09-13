@@ -10,7 +10,8 @@ Want to save a great game? Download it directly from YouTube, or add the matchin
 
 **[Download for Windows](https://github.com/Deddyn/deddys-post-stream-suite/releases/latest)**
 
-<img width="1171" height="841" alt="Screenshot 2026-09-13 011545" src="https://github.com/user-attachments/assets/0b400874-5973-4f1d-954a-113c441bd964" />
+<img width="1175" height="815" alt="image" src="https://github.com/user-attachments/assets/11b19fd9-db75-4523-8fee-45158c048458" />
+
 
 
 ## Quick start — Windows 10/11, 64-bit
