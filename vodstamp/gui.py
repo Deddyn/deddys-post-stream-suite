@@ -7,7 +7,7 @@ from .timezones import OPTIONS, DEFAULT, resolve
 import webbrowser
 from .core import ACCOUNTS, output, stamp, video_id
 from .api import Http, Riot, youtube_range, ApiError
-from .credentials import load_riot_key
+from .credentials import load_riot_key, save_riot_key
 from .diagnostics import diagnose
 from . import downloader
 import re
@@ -19,18 +19,26 @@ class App:
         self.download_buttons = {}
         self.downloading = False
         root.title('Deddy’s Post Stream Suite')
-        root.geometry('1080x760')
-        root.minsize(850, 650)
+        root.geometry('1180x820')
+        root.minsize(980, 700)
+        self.colors = {
+            'bg': '#101419', 'panel': '#181e26', 'field': '#11171e',
+            'raised': '#222c38', 'border': '#303b49', 'text': '#edf2f8',
+            'muted': '#a4b0c0', 'blue': '#71b7ff', 'blue_dark': '#5199e5',
+            'focus': '#9bd0ff', 'success': '#91c9b1',
+        }
+        root.configure(background=self.colors['bg'])
+        self._configure_styles()
         style = ttk.Style(root)
-        style.theme_use('clam')
-        style.configure('Download.TButton', font=('Segoe UI', 9), padding=(4, 0))
         probe = ttk.Button(root, text='Download', style='Download.TButton')
         root.update_idletasks()
-        style.configure('Treeview', rowheight=max(34, probe.winfo_reqheight() + 6))
+        style.configure('Treeview', rowheight=max(38, probe.winfo_reqheight() + 8))
         probe.destroy()
-        frame = ttk.Frame(root, padding=18)
+
+        frame = ttk.Frame(root, padding=(24, 12, 24, 12))
         frame.pack(fill='both', expand=True)
-        frame.columnconfigure(1, weight=1)
+        frame.columnconfigure(0, weight=1)
+        frame.rowconfigure(4, weight=1)
         defaults = dict(twitch='', twitch_offset='0', url='', start='', end='', zone=DEFAULT, offset='0', accounts='; '.join(ACCOUNTS))
         self.values = {k: tk.StringVar(value=v) for k, v in defaults.items()}
         try:
@@ -39,63 +47,252 @@ class App:
         except ValueError as error:
             initial_key, key_status = '', str(error)
         self.values['riot'] = tk.StringVar(value=initial_key)
+        self._riot_dirty = False
+        self._riot_loading = False
+        self._riot_clean_value = initial_key
+        self._riot_save_after = None
         self.test_buttons = []
-        ttk.Label(frame, text='Deddy’s Post Stream Suite', font=('Segoe UI', 19, 'bold')).grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 12))
-        for row_index, label, left_key, right_key in [
-                (1, 'URL VOD', 'url', 'twitch'),
-                (2, 'Offset (in seconds)', 'offset', 'twitch_offset')]:
-            ttk.Label(frame, text=label).grid(row=row_index, column=0, sticky='w', padx=(0, 12), pady=3)
-            pair = ttk.Frame(frame)
-            pair.grid(row=row_index, column=1, sticky='ew', pady=3)
-            pair.columnconfigure(1, weight=1, uniform='pair')
-            pair.columnconfigure(3, weight=1, uniform='pair')
-            ttk.Label(pair, text='YouTube').grid(row=0, column=0, padx=(0, 8))
-            ttk.Entry(pair, textvariable=self.values[left_key], width=12).grid(row=0, column=1, sticky='ew')
-            ttk.Label(pair, text='Twitch').grid(row=0, column=2, padx=(16, 8))
-            ttk.Entry(pair, textvariable=self.values[right_key], width=12).grid(row=0, column=3, sticky='ew')
-        fields = [('start', 'Start'), ('end', 'End'), ('zone', 'Timezone'), ('accounts', 'EUW accounts (separate with ;) '), ('riot', 'Riot Personal API Key')]
-        for index, (key, label) in enumerate(fields, 3):
-            field_label = ttk.Label(frame, text=label)
-            if key == 'riot':
-                field_label.configure(foreground='#165aa7', cursor='hand2', font=('Segoe UI', 9, 'underline'), takefocus=True)
-                open_portal = lambda event: webbrowser.open('https://developer.riotgames.com/app-type')
-                field_label.bind('<Button-1>', open_portal)
-                field_label.bind('<Return>', open_portal)
-            field_label.grid(row=index, column=0, sticky='w', padx=(0, 12), pady=3)
-            widget = ttk.Combobox(frame, textvariable=self.values[key], values=list(OPTIONS), state='readonly', height=18) if key == 'zone' else ttk.Entry(frame, textvariable=self.values[key], show='•' if key == 'riot' else '', state='readonly' if key in ('start', 'end', 'riot') else 'normal')
-            widget.grid(row=index, column=1, sticky='ew', pady=3)
-            if key == 'riot':
-                button = ttk.Button(frame, text='Test Riot', command=lambda: self.test_api('Riot'))
-                button.grid(row=index, column=2, padx=(8, 0))
-                self.test_buttons.append(button)
-        ttk.Label(frame, text='Start / End: DD-MM-YYYY HH:MM:SS. Times are detected when you generate. Settings reset on launch.').grid(row=10, column=0, columnspan=2, sticky='w', pady=8)
-        actions = ttk.Frame(frame)
-        actions.grid(row=11, column=0, columnspan=2, sticky='ew')
-        self.generate = ttk.Button(actions, text='Generate timestamps', command=self.run)
+
+        header = ttk.Frame(frame)
+        header.grid(row=0, column=0, sticky='ew', pady=(0, 8))
+        header.columnconfigure(0, weight=1)
+        title_box = ttk.Frame(header)
+        title_box.grid(row=0, column=0, sticky='w')
+        ttk.Label(title_box, text='Post Stream Suite', style='Title.TLabel').pack(anchor='w')
+        self._link(title_box, 'Github page', 'https://github.com/Deddyn/deddys-post-stream-suite').pack(anchor='w', pady=(3, 0))
+        socials = ttk.Frame(header)
+        socials.grid(row=0, column=1, sticky='e')
+        ttk.Label(socials, text='My socials:', style='Muted.TLabel').pack(side='left', padx=(0, 12))
+        self._link(socials, 'Twitch', 'https://www.twitch.tv/deddy__/').pack(side='left', padx=(0, 18))
+        self._link(socials, 'Youtube', 'https://www.youtube.com/@DeddynYT').pack(side='left')
+
+        settings = ttk.Frame(frame, style='Panel.TFrame', padding=(14, 8))
+        settings.grid(row=1, column=0, sticky='ew')
+        settings.columnconfigure(0, weight=1, uniform='source')
+        settings.columnconfigure(1, weight=1, uniform='source')
+        ttk.Label(settings, text='Stream sources', style='PanelSection.TLabel').grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 5))
+        youtube = ttk.Frame(settings, style='Panel.TFrame')
+        twitch = ttk.Frame(settings, style='Panel.TFrame')
+        youtube.grid(row=1, column=0, sticky='ew', padx=(0, 16))
+        twitch.grid(row=1, column=1, sticky='ew')
+        for box in (youtube, twitch):
+            box.columnconfigure(0, weight=1)
+        self._field(youtube, 0, 'YouTube VOD URL', 'url')
+        self._field(twitch, 0, 'Twitch VOD URL · optional', 'twitch')
+        self._offset_field(youtube, 'YouTube offset (s)', 'offset', 'Applied to timestamps and YouTube downloads')
+        self._offset_field(twitch, 'Twitch offset (s)', 'twitch_offset', 'Applied to Twitch downloads')
+
+        details = ttk.Frame(frame)
+        details.grid(row=2, column=0, sticky='ew', pady=(8, 6))
+        details.columnconfigure(0, weight=1, uniform='details')
+        details.columnconfigure(1, weight=1, uniform='details')
+        details.columnconfigure(2, weight=2, uniform='details')
+        self._field(details, 0, 'Start · detected from YouTube', 'start', column=0, readonly=True, padx=(0, 12))
+        self._field(details, 0, 'End · detected from YouTube', 'end', column=1, readonly=True, padx=(0, 12))
+        self._field(details, 0, 'Timezone', 'zone', column=2, combo=True)
+        ttk.Label(details, text='Daylight saving time adjusts automatically.', style='Caption.TLabel').grid(row=2, column=2, sticky='w', pady=(2, 0))
+
+        account_row = ttk.Frame(frame)
+        account_row.grid(row=3, column=0, sticky='ew', pady=(0, 6))
+        account_row.columnconfigure(0, weight=1, uniform='account')
+        account_row.columnconfigure(1, weight=1, uniform='account')
+        accounts_box = ttk.Frame(account_row)
+        accounts_box.grid(row=0, column=0, sticky='new', padx=(0, 16))
+        accounts_box.columnconfigure(0, weight=1)
+        self._field(accounts_box, 0, 'EUW accounts · separate with ;', 'accounts')
+        key_box = ttk.Frame(account_row)
+        key_box.grid(row=0, column=1, sticky='ew')
+        key_box.columnconfigure(0, weight=1)
+        self._link(key_box, 'Riot Personal API Key ↗', 'https://developer.riotgames.com/app-type').grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 4))
+        ttk.Entry(key_box, textvariable=self.values['riot'], show='•').grid(row=1, column=0, sticky='ew')
+        button = ttk.Button(key_box, text='Test Riot', command=lambda: self.test_api('Riot'))
+        button.grid(row=1, column=1, padx=(8, 0))
+        self.test_buttons.append(button)
+        self.riot_status = tk.StringVar(value='Loaded from Riot API.txt' if initial_key else 'Paste your key here; Riot API.txt is ready.')
+        ttk.Label(key_box, textvariable=self.riot_status, style='Caption.TLabel', wraplength=440).grid(row=2, column=0, sticky='w', pady=(3, 0))
+
+        workspace = ttk.Frame(frame)
+        workspace.grid(row=4, column=0, sticky='nsew')
+        workspace.columnconfigure(0, weight=1)
+        workspace.rowconfigure(2, weight=1)
+        action_bar = ttk.Frame(workspace, padding=(0, 6, 0, 5))
+        action_bar.grid(row=0, column=0, sticky='ew')
+        self.generate = ttk.Button(action_bar, text='Find Matches', style='Primary.TButton', command=self.run)
         self.generate.pack(side='left')
-        ttk.Button(actions, text='Include/exclude rows', command=self.toggle).pack(side='left', padx=8)
-        ttk.Button(actions, text='Select all', command=lambda: self.select_all(True)).pack(side='left')
-        ttk.Button(actions, text='Exclude all', command=lambda: self.select_all(False)).pack(side='left', padx=8)
-        ttk.Button(actions, text='Copy', command=self.copy).pack(side='right')
         self.status = tk.StringVar(value=key_status)
-        ttk.Label(frame, textvariable=self.status, wraplength=1000).grid(row=12, column=0, columnspan=2, sticky='w', pady=8)
-        table = ttk.Frame(frame)
-        table.grid(row=13, column=0, columnspan=2, sticky='nsew')
-        frame.rowconfigure(13, weight=1)
+        ttk.Label(action_bar, textvariable=self.status, style='Status.TLabel', wraplength=760).pack(side='left', padx=(16, 0))
+
+        match_header = ttk.Frame(workspace)
+        match_header.grid(row=1, column=0, sticky='ew', pady=(2, 5))
+        ttk.Label(match_header, text='Matches', style='Section.TLabel').pack(side='left')
+        self.selected_count = tk.StringVar(value='0 selected')
+        ttk.Label(match_header, textvariable=self.selected_count, style='Muted.TLabel').pack(side='left', padx=(14, 0))
+        ttk.Button(match_header, text='Toggle selected', command=self.toggle).pack(side='right')
+        ttk.Button(match_header, text='Exclude all', command=lambda: self.select_all(False)).pack(side='right', padx=8)
+        ttk.Button(match_header, text='Select all', command=lambda: self.select_all(True)).pack(side='right')
+
+        table = ttk.Frame(workspace, style='Table.TFrame')
+        table.grid(row=2, column=0, sticky='nsew')
         self.tree = ttk.Treeview(table, columns=('use', 'time', 'account', 'title', 'download'), show='headings', selectmode='extended')
-        for key, title, width in [('use', 'Include', 55), ('time', 'Timestamp', 90), ('account', 'Account', 140), ('title', 'Title', 240), ('download', 'Download', 180)]:
+        for key, title, width, stretch in [('use', 'Include', 64, False), ('time', 'Timestamp', 110, False), ('account', 'Account', 170, False), ('title', 'Match', 360, True), ('download', 'Download', 220, False)]:
             self.tree.heading(key, text=title)
-            self.tree.column(key, width=width, minwidth=170 if key == 'download' else 45)
+            self.tree.column(key, width=width, minwidth=200 if key == 'download' else 55, stretch=stretch)
         scroll = ttk.Scrollbar(table, orient='vertical', command=self.tree.yview)
         self.tree.configure(yscrollcommand=scroll.set)
         self.tree.pack(side='left', fill='both', expand=True)
         scroll.pack(side='right', fill='y')
         self.tree.bind('<space>', lambda _: self.toggle())
         self.tree.bind('<Double-1>', self.edit)
-        self.preview = tk.Text(frame, height=6, wrap='word')
-        self.preview.grid(row=14, column=0, columnspan=2, sticky='ew', pady=(10, 0))
+        preview_header = ttk.Frame(workspace)
+        preview_header.grid(row=3, column=0, sticky='ew', pady=(6, 4))
+        ttk.Label(preview_header, text='YouTube timestamps', style='Section.TLabel').pack(side='left')
+        ttk.Label(preview_header, text='Double-click a match title to edit it.', style='Muted.TLabel').pack(side='left', padx=(16, 0))
+        ttk.Button(preview_header, text='Copy timestamps', style='Primary.TButton', command=self.copy).pack(side='right')
+        self.preview = tk.Text(
+            workspace, height=3, wrap='word', background=self.colors['field'], foreground=self.colors['text'],
+            insertbackground=self.colors['text'], selectbackground=self.colors['blue_dark'], relief='flat',
+            borderwidth=1, highlightthickness=1, highlightbackground=self.colors['border'],
+            highlightcolor=self.colors['focus'], padx=12, pady=6, font=('Consolas', 10), takefocus=True,
+        )
+        self.preview.grid(row=4, column=0, sticky='ew')
         self.values['url'].trace_add('write', self.clear_dates)
+        self.values['riot'].trace_add('write', self._riot_edited)
+        root.protocol('WM_DELETE_WINDOW', self.close)
         root.after(100, self.poll)
+
+    def _set_riot_value(self, value):
+        self._riot_loading = True
+        try:
+            self.values['riot'].set(value)
+        finally:
+            self._riot_loading = False
+        self._riot_clean_value = value
+        self._riot_dirty = False
+
+    def _riot_edited(self, *_):
+        if self._riot_loading:
+            return
+        if self.values['riot'].get() == self._riot_clean_value:
+            self._riot_dirty = False
+            if self._riot_save_after is not None:
+                self.root.after_cancel(self._riot_save_after)
+                self._riot_save_after = None
+            return
+        self._riot_dirty = True
+        self.riot_status.set('Saving Riot key…')
+        if self._riot_save_after is not None:
+            self.root.after_cancel(self._riot_save_after)
+        self._riot_save_after = self.root.after(450, self._save_riot_edit)
+
+    def _save_riot_edit(self):
+        self._riot_save_after = None
+        if not self._riot_dirty:
+            return True
+        key = self.values['riot'].get().strip()
+        try:
+            save_riot_key(key)
+        except (ValueError, OSError) as error:
+            self.riot_status.set('Riot key not saved: ' + str(error))
+            return False
+        self._riot_dirty = False
+        self._riot_clean_value = key
+        self.riot_status.set('Riot key saved to Riot API.txt.')
+        return True
+
+    def _riot_key_for_action(self):
+        if self._riot_dirty:
+            key = self.values['riot'].get().strip()
+            saved = self._save_riot_edit()
+            if not key or any(character.isspace() for character in key):
+                raise ValueError('Enter one Riot API key without spaces or extra lines.')
+            if not saved:
+                self.status.set('Using edited Riot key for this action; Riot API.txt was not saved.')
+            return key
+        key = load_riot_key()
+        self._set_riot_value(key)
+        self.riot_status.set('Loaded from Riot API.txt.')
+        return key
+
+    def close(self):
+        if self._riot_save_after is not None:
+            self.root.after_cancel(self._riot_save_after)
+            self._riot_save_after = None
+        if self._riot_dirty and not self._save_riot_edit():
+            close_anyway = messagebox.askyesno(
+                'Riot key not saved',
+                'Riot API.txt could not be saved. Close without saving your edited key?',
+                parent=self.root,
+                icon='warning',
+                default='no',
+            )
+            if not close_anyway:
+                return
+        self.root.destroy()
+
+    def _configure_styles(self):
+        c = self.colors
+        style = ttk.Style(self.root)
+        style.theme_use('clam')
+        style.configure('.', background=c['bg'], foreground=c['text'], font=('Segoe UI', 10))
+        style.configure('TFrame', background=c['bg'])
+        style.configure('Panel.TFrame', background=c['panel'])
+        style.configure('Table.TFrame', background=c['border'], borderwidth=1, relief='solid')
+        style.configure('TLabel', background=c['bg'], foreground=c['text'])
+        style.configure('Title.TLabel', font=('Segoe UI', 22, 'bold'), foreground=c['text'])
+        style.configure('Section.TLabel', font=('Segoe UI', 13, 'bold'), foreground=c['text'])
+        style.configure('PanelSection.TLabel', background=c['panel'], foreground=c['text'], font=('Segoe UI', 13, 'bold'))
+        style.configure('Muted.TLabel', foreground=c['muted'])
+        style.configure('Caption.TLabel', foreground=c['muted'], font=('Segoe UI', 8))
+        style.configure('Status.TLabel', foreground=c['success'])
+        style.configure('Field.TLabel', background=c['panel'], foreground=c['muted'], font=('Segoe UI', 9))
+        style.configure('PanelMuted.TLabel', background=c['panel'], foreground=c['muted'], font=('Segoe UI', 8))
+        style.configure('TEntry', fieldbackground=c['field'], foreground=c['text'], bordercolor=c['border'], lightcolor=c['border'], darkcolor=c['border'], padding=(8, 4))
+        style.map('TEntry', fieldbackground=[('readonly', c['field']), ('disabled', c['field'])], foreground=[('readonly', c['text']), ('disabled', c['muted'])], bordercolor=[('focus', c['focus'])])
+        style.configure('TCombobox', fieldbackground=c['field'], background=c['raised'], foreground=c['text'], arrowcolor=c['muted'], bordercolor=c['border'], padding=(8, 5))
+        style.map('TCombobox', fieldbackground=[('readonly', c['field'])], foreground=[('readonly', c['text'])], bordercolor=[('focus', c['focus'])], arrowcolor=[('active', c['text'])])
+        style.configure('TButton', background=c['raised'], foreground=c['text'], bordercolor=c['border'], focusthickness=2, focuscolor=c['focus'], padding=(12, 5), font=('Segoe UI', 9, 'bold'))
+        style.map('TButton', background=[('active', '#2b3745'), ('pressed', c['field']), ('disabled', c['panel'])], foreground=[('disabled', '#6f7a88')], bordercolor=[('focus', c['focus'])])
+        style.configure('Primary.TButton', background=c['blue'], foreground=c['bg'], bordercolor=c['blue'], padding=(18, 8), font=('Segoe UI', 10, 'bold'))
+        style.map('Primary.TButton', background=[('active', '#89c4ff'), ('pressed', c['blue_dark']), ('disabled', '#40566d')], foreground=[('disabled', '#8b9cad')], bordercolor=[('focus', c['focus'])])
+        style.configure('Download.TButton', font=('Segoe UI', 9, 'bold'), padding=(4, 2), background=c['raised'], foreground=c['text'], bordercolor=c['border'])
+        style.configure('Youtube.Download.TButton', foreground='#f4b6b6')
+        style.configure('Twitch.Download.TButton', foreground='#cebaff')
+        style.configure('Treeview', background=c['panel'], fieldbackground=c['panel'], foreground=c['text'], borderwidth=0, font=('Segoe UI', 10))
+        style.map('Treeview', background=[('selected', '#1b3a55')], foreground=[('selected', c['text'])])
+        style.configure('Treeview.Heading', background=c['raised'], foreground=c['muted'], bordercolor=c['border'], relief='flat', font=('Segoe UI', 9, 'bold'), padding=(8, 7))
+        style.map('Treeview.Heading', background=[('active', '#293442')])
+        style.configure('Vertical.TScrollbar', background=c['raised'], troughcolor=c['field'], bordercolor=c['field'], arrowcolor=c['muted'])
+
+    def _link(self, parent, text, url):
+        label = tk.Label(
+            parent, text=text, background=self.colors['bg'], foreground=self.colors['blue'],
+            activeforeground=self.colors['focus'], activebackground=self.colors['bg'],
+            font=('Segoe UI', 10, 'underline'), cursor='hand2', takefocus=True,
+            highlightthickness=2, highlightbackground=self.colors['bg'], highlightcolor=self.colors['focus'],
+            borderwidth=0, padx=2, pady=1,
+        )
+        open_url = lambda _event=None: webbrowser.open(url)
+        label.bind('<Button-1>', open_url)
+        label.bind('<Return>', open_url)
+        label.bind('<space>', open_url)
+        return label
+
+    def _field(self, parent, row, label, key, column=0, readonly=False, combo=False, padx=0):
+        ttk.Label(parent, text=label, style='Field.TLabel' if parent.cget('style') == 'Panel.TFrame' else 'Muted.TLabel').grid(row=row, column=column, sticky='w', padx=padx, pady=(0, 4))
+        if combo:
+            widget = ttk.Combobox(parent, textvariable=self.values[key], values=list(OPTIONS), state='readonly', height=18)
+        else:
+            widget = ttk.Entry(parent, textvariable=self.values[key], state='readonly' if readonly else 'normal')
+        widget.grid(row=row + 1, column=column, sticky='ew', padx=padx)
+        return widget
+
+    def _offset_field(self, parent, label, key, help_text):
+        row = 2
+        ttk.Label(parent, text=label, style='Field.TLabel').grid(row=row, column=0, sticky='w', pady=(7, 3))
+        line = ttk.Frame(parent, style='Panel.TFrame')
+        line.grid(row=row + 1, column=0, sticky='ew')
+        ttk.Entry(line, textvariable=self.values[key], width=12).pack(side='left')
+        ttk.Label(line, text=help_text, style='PanelMuted.TLabel').pack(side='left', padx=(12, 0))
 
     def place_download_buttons(self):
         enabled = {}
@@ -112,7 +309,12 @@ class App:
                     button.destroy()
         for item in self.tree.get_children():
             if item not in self.download_buttons:
-                self.download_buttons[item] = {p: ttk.Button(self.tree, text=p, style='Download.TButton', command=lambda i=item, platform=p: self.download_row(i, platform)) for p in ('Youtube', 'Twitch')}
+                self.download_buttons[item] = {
+                    p: ttk.Button(
+                        self.tree, text=p, style=f'{p}.Download.TButton',
+                        command=lambda i=item, platform=p: self.download_row(i, platform),
+                    ) for p in ('Youtube', 'Twitch')
+                }
             box = self.tree.bbox(item, 'download')
             for index, (platform, button) in enumerate(self.download_buttons[item].items()):
                 button.configure(state='normal' if enabled[platform] else 'disabled')
@@ -137,15 +339,19 @@ class App:
             return
         window = tk.Toplevel(self.root)
         window.title('Download ' + platform)
+        window.configure(background=self.colors['bg'])
+        window.resizable(False, False)
         window.transient(self.root)
         window.grab_set()
-        ttk.Label(window, text=row.title, padding=12).pack()
-        ttk.Label(window, text=f'Seconds in the {platform} VOD. Includes 10 s before and 20 s after.').pack(padx=12)
+        body = ttk.Frame(window, padding=20)
+        body.pack(fill='both', expand=True)
+        ttk.Label(body, text=row.title, style='Section.TLabel', wraplength=480).pack(anchor='w')
+        ttk.Label(body, text=f'Seconds in the {platform} VOD. Includes 10 s before and 20 s after.', style='Muted.TLabel').pack(anchor='w', pady=(4, 12))
         begin, finish = tk.StringVar(value=str(start)), tk.StringVar(value=str(end))
         for label, variable in [('Start (seconds)', begin), ('End (seconds)', finish)]:
-            ttk.Label(window, text=label).pack(pady=(8, 0))
-            ttk.Entry(window, textvariable=variable).pack(padx=12)
-        ttk.Label(window, text=f'Suggested trim: {stamp(start)} — {stamp(end)}').pack(padx=12, pady=8)
+            ttk.Label(body, text=label, style='Muted.TLabel').pack(anchor='w', pady=(8, 4))
+            ttk.Entry(body, textvariable=variable, width=44).pack(fill='x')
+        ttk.Label(body, text=f'Suggested trim: {stamp(start)} — {stamp(end)}', style='Muted.TLabel').pack(anchor='w', pady=(10, 0))
         def launch():
             try:
                 a, b = int(begin.get()), int(finish.get())
@@ -171,7 +377,7 @@ class App:
                 except (ValueError, OSError) as error:
                     self.events.put(('download_error', str(error)))
             threading.Thread(target=worker, daemon=True).start()
-        ttk.Button(window, text='Choose destination and download', command=launch).pack(padx=12, pady=12)
+        ttk.Button(body, text='Choose destination and download', style='Primary.TButton', command=launch).pack(anchor='e', pady=(16, 0))
 
     def refresh(self):
         for i, row in enumerate(self.rows):
@@ -184,6 +390,7 @@ class App:
         self.preview.delete('1.0', 'end')
         self.preview.insert('1.0', output(self.rows))
         self.preview.configure(state='disabled')
+        self.selected_count.set(f'{sum(row.selected for row in self.rows)} selected')
 
     def toggle(self):
         for item in self.tree.selection():
@@ -234,9 +441,7 @@ class App:
     def test_api(self, provider):
         accounts, url = self.values['accounts'].get(), self.values['url'].get()
         try:
-            key = load_riot_key() if provider == 'Riot' else ''
-            if provider == 'Riot':
-                self.values['riot'].set(key)
+            key = self._riot_key_for_action() if provider == 'Riot' else ''
             zone = resolve(self.values['zone'].get())
         except (ValueError, KeyError):
             messagebox.showerror('Configuration', 'Check Riot API.txt and your timezone.')
@@ -261,14 +466,25 @@ class App:
         window = tk.Toplevel(self.root)
         window.title('API test results')
         window.geometry('760x480')
-        text = tk.Text(window, wrap='word', padx=12, pady=12)
+        window.minsize(560, 360)
+        window.configure(background=self.colors['bg'])
+        body = ttk.Frame(window, padding=16)
+        body.pack(fill='both', expand=True)
+        ttk.Label(body, text='API test results', style='Section.TLabel').pack(anchor='w', pady=(0, 10))
+        text = tk.Text(
+            body, wrap='word', padx=12, pady=12, background=self.colors['field'],
+            foreground=self.colors['text'], insertbackground=self.colors['text'],
+            selectbackground=self.colors['blue_dark'], relief='flat', borderwidth=1,
+            highlightthickness=1, highlightbackground=self.colors['border'],
+            highlightcolor=self.colors['focus'], font=('Consolas', 10),
+        )
         text.pack(fill='both', expand=True)
         text.insert('1.0', report)
         text.configure(state='disabled')
         def copy_report():
             self.root.clipboard_clear()
             self.root.clipboard_append(report)
-        ttk.Button(window, text='Copy report (no keys)', command=copy_report).pack(pady=8)
+        ttk.Button(body, text='Copy report (no keys)', style='Primary.TButton', command=copy_report).pack(anchor='e', pady=(10, 0))
 
     def run(self):
         values = {k: v.get().strip() for k, v in self.values.items()}
@@ -278,8 +494,7 @@ class App:
                 raise ValueError('Enter accounts as Name#TAG, separated by ;')
             offset = int(values['offset'])
             zone = resolve(values['zone'])
-            values['riot'] = load_riot_key()
-            self.values['riot'].set(values['riot'])
+            values['riot'] = self._riot_key_for_action()
         except (ValueError, OSError, KeyError) as error:
             messagebox.showerror('Configuration', str(error))
             return
@@ -330,7 +545,7 @@ class App:
                     else:
                         self.rows, start, end = value
                         self.refresh()
-                        self.status.set(f'{len(self.rows)} matches · {start.strftime('%d-%m-%Y')} · see Start / End for local times. Check matchups and VOD offsets.')
+                        self.status.set(f"{len(self.rows)} matches · {start.strftime('%d-%m-%Y')} · check matchups and VOD offsets.")
         except queue.Empty:
             pass
         self.place_download_buttons()

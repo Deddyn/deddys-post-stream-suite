@@ -1,1 +1,15 @@
-Replace this line with your own Riot API key and save as Riot API.txt.
+Paste your API Key here:
+
+
+
+--- Instructions ---
+1. Open the Riot Developer Portal and sign in: https://developer.riotgames.com/
+2. Select Register Product, then choose the Personal application type: https://developer.riotgames.com/app-type
+3. Enter any product name, choose League of Legends, paste the description below, and submit it for approval.
+4. Once approved, go to Apps, open the registered project, and copy its Personal API Key.
+5. Paste the key above or into the masked field in the app, then click Test Riot.
+
+Application description:
+I use this desktop tool privately to match my EUW League of Legends games to my livestream VODs, create timestamps, and trim recordings of my own games.
+
+Riot Developer Portal documentation: https://developer.riotgames.com/docs/portal

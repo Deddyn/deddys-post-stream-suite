@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import zipfile
+from vodstamp.credentials import KEY_TEMPLATE
 
 ROOT = Path(__file__).resolve().parent
 
@@ -17,14 +18,19 @@ def build(version, output):
                     '--name', name, '--collect-all', 'tzdata', '--distpath', str(output / 'app'),
                     '--workpath', str(output / 'build'), '--specpath', str(output), str(ROOT / 'launcher.py')], cwd=ROOT, check=True)
     folder = output / 'app' / name
-    for filename in ('README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'Riot API.example.txt', 'start.cmd'):
+    for filename in ('README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'start.cmd'):
         shutil.copy2(ROOT / filename, folder / filename)
     for component in ('TwitchDownloaderCLI', 'yt-dlp', 'ffmpeg', 'deno'):
         shutil.copytree(ROOT / 'tools' / component, folder / 'tools' / component, dirs_exist_ok=True,
                         ignore=shutil.ignore_patterns('*.pdb'))
     shutil.copytree(ROOT / 'licenses', folder / 'licenses', dirs_exist_ok=True)
-    if any(p.name.lower() == 'riot api.txt' for p in folder.rglob('*')):
-        raise RuntimeError('Private key filename found in staging!')
+    key_file = folder / 'Riot API.txt'
+    for path in folder.rglob('*'):
+        if path.name.lower() == 'riot api.txt':
+            if path != key_file or path.read_text(encoding='utf-8') != KEY_TEMPLATE:
+                raise RuntimeError('Non-template key file found in staging; use a fresh output folder.')
+    # Always generate from the public blank template, never from a local user's file.
+    key_file.write_text(KEY_TEMPLATE, encoding='utf-8')
     archive = output / f'{name}-{version}-Windows-x64.zip'
     with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=6) as bundle:
         for path in folder.rglob('*'):

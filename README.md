@@ -17,11 +17,11 @@ Want to save a great game? Download it directly from YouTube, or add the matchin
 
 1. Open this repository’s **Releases** page and download the Windows ZIP asset, not GitHub’s automatic “Source code” ZIP.
 2. Right-click the ZIP, choose **Extract All**, and keep the whole extracted folder together. Do not run the app inside the ZIP.
-3. Create `Riot API.txt` next to `DeddysPostStreamSuite.exe`, or rename `Riot API.example.txt`. Paste only your own key into that file, save as UTF-8, and close the editor. Make sure Windows has not named it `Riot API.txt.txt`.
+3. Get your own Riot API key using the steps below. Paste it into the app's **Riot Personal API Key** field, or into the marked space in the included `Riot API.txt` file.
 4. Open `DeddysPostStreamSuite.exe`. Python is included. The release also contains TwitchDownloaderCLI, yt-dlp, FFmpeg/FFprobe and Deno; no separate setup is needed.
 5. Replace the example EUW accounts with yours, using `Name#TAG; OtherName#TAG`. This version supports **EUW accounts**, not every Riot server.
 6. Choose your city’s timezone and enter the YouTube link to a **public, completed livestream VOD**.
-7. Click **Generate timestamps**. Start and End fill automatically. Review titles, include/exclude rows and click **Copy**.
+7. Click **Find Matches**. Start and End fill automatically. Review titles, include/exclude rows and click **Copy timestamps**.
 
 The application is unsigned. Windows may display a publisher warning. Verify that your ZIP came from this repository’s release and compare its SHA-256 with the published checksum; do not disable antivirus protection.
 
@@ -29,16 +29,16 @@ The application is unsigned. Windows may display a publisher warning. Verify tha
 
 1. Open the [Riot Developer Portal](https://developer.riotgames.com/) and sign in with your Riot account.
 2. Choose [Register Product](https://developer.riotgames.com/app-type), then the personal-project option for your own private use.
-3. Select League of Legends/Standard APIs where requested. Provide a truthful description of your use, the repository URL and any other requested details.
-4. Submit the application. Check its messages/status in the portal and answer any questions from Riot. Approval is not guaranteed.
-5. Once approved, open your registered project and copy its **Personal API Key** into the local `Riot API.txt` file.
-6. Click **Test Riot** in the app. It checks account lookup, match history and one recent match for each configured account.
+3. Give your personal application any name you like. Select **League of Legends**, complete the form and submit it. You can copy this description if it matches your intended use:
 
-Example description to adapt truthfully: “I use this desktop tool privately to match my EUW League of Legends games to my livestream VODs, create timestamps, and trim recordings of my own games.”
+   ```text
+   I use this desktop tool privately to match my EUW League of Legends games to my livestream VODs, create timestamps, and trim recordings of my own games.
+   ```
 
-The portal’s temporary **Development Key expires every 24 hours**. Personal keys are intended for personal/private use, while public-facing products require appropriate Riot approval and production access. A public source repository does not itself grant permission to operate a public API service. Never distribute your key or assume that individual keys remove Riot’s policy requirements. See [Riot’s key and registration guidance](https://developer.riotgames.com/docs/portal).
+4. In the portal, open **Apps**, select the application you just registered and, once approved, copy its **Personal API Key**.
+5. Paste the key into the tool's **Riot Personal API Key** field and click **Test Riot**. The tool saves it locally in `Riot API.txt` in the app folder, so you do not need to paste it again next time. You can also edit the marked key space in that file directly.
 
-The underlined **Riot Personal API Key** label opens the application page. The tool reads the file at launch and before generating/testing, so you can replace an expired key without changing code. Keys are masked in the UI, excluded from Git and release packaging, and never included in diagnostic reports. The local text file is unencrypted: do not share it or include it in screenshots/ZIPs.
+For more information, see [Riot's API key guide](https://developer.riotgames.com/docs/portal).
 
 ## Fields and timestamps
 
@@ -49,7 +49,7 @@ The underlined **Riot Personal API Key** label opens the application page. The t
 - **YouTube offset:** seconds added to match timestamps and YouTube trims.
 - **Twitch offset:** separate seconds added to the match’s position relative to YouTube’s stream start. If Twitch started 30 seconds earlier, use `+30`; if 30 seconds later, use `-30`. It does not inherit the YouTube offset.
 
-No settings or match results persist between launches. Links and dates start empty; offsets, timezone and example accounts return to their defaults. Your key file stays in place. Updates: extract the new release into a new folder and copy your private `Riot API.txt` into it.
+Only your Riot API key is saved between launches. Links and dates start empty; offsets, timezone and example accounts return to their defaults. The key stays in the local, unencrypted `Riot API.txt` file; keep it private. Updates: extract the new release into a new folder and replace its blank `Riot API.txt` with your existing file.
 
 ## Review and download matches
 
@@ -63,7 +63,8 @@ One download runs at a time. Progress appears in the main window; keep it open u
 
 ## Troubleshooting
 
-- **Missing key:** create the UTF-8 file next to the executable, not inside `_internal`.
+- **Missing key:** paste your key into the app's **Riot Personal API Key** field, or into the marked space in the included `Riot API.txt`. A missing file is recreated automatically.
+- **Key could not be saved:** extract the app into a folder you can write to, then paste the key again.
 - **Riot 403:** run Test Riot and compare the same current key in the official portal. A 403 alone does not prove a typo; the app distinguishes recognizable API denials from web protection responses.
 - **Riot 404:** check Riot ID spelling, tag and EUW region.
 - **Rate limit:** let the app wait or retry later. It respects bounded Retry-After delays.

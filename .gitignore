@@ -7,6 +7,7 @@ build/
 dist/
 *.spec
 Riot API.txt
+Riot API.txt.*.tmp
 tools/
 downloads/
 yt-dlp
